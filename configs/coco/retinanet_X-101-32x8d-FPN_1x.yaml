@@ -2,6 +2,7 @@ MODEL:
   TYPE: retinanet
   CONV_BODY: FPN.add_fpn_ResNet101_conv5_body
   NUM_CLASSES: 81
+  ATTR: False
 NUM_GPUS: 8
 SOLVER:
   WEIGHT_DECAY: 0.0001
@@ -20,8 +21,8 @@ FPN:
 RESNETS:
   STRIDE_1X1: False  # default True for MSRA; False for C2 or Torch models
   TRANS_FUNC: bottleneck_transformation
-  NUM_GROUPS: 64
-  WIDTH_PER_GROUP: 4
+  NUM_GROUPS: 32
+  WIDTH_PER_GROUP: 8
 RETINANET:
   RETINANET_ON: True
   NUM_CONVS: 4
@@ -31,7 +32,7 @@ RETINANET:
   LOSS_GAMMA: 2.0
   LOSS_ALPHA: 0.25
 TRAIN:
-  WEIGHTS: https://s3-us-west-2.amazonaws.com/detectron/ImageNetPretrained/FBResNeXt/X-101-64x4d.pkl
+  WEIGHTS: https://s3-us-west-2.amazonaws.com/detectron/ImageNetPretrained/20171220/X-101-32x8d.pkl
   DATASETS: ('coco_2014_train', 'coco_2014_valminusminival')
   SCALES: (800,)
   MAX_SIZE: 1333

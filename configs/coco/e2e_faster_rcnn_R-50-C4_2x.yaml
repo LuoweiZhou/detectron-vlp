@@ -2,6 +2,7 @@ MODEL:
   TYPE: generalized_rcnn
   CONV_BODY: ResNet.add_ResNet50_conv4_body
   NUM_CLASSES: 81
+  ATTR: False
   FASTER_RCNN: True
 NUM_GPUS: 8
 SOLVER:
@@ -9,9 +10,9 @@ SOLVER:
   LR_POLICY: steps_with_decay
   BASE_LR: 0.01
   GAMMA: 0.1
-  # 1x schedule (note TRAIN.IMS_PER_BATCH: 1)
-  MAX_ITER: 180000
-  STEPS: [0, 120000, 160000]
+  # 2x schedule (note TRAIN.IMS_PER_BATCH: 1)
+  MAX_ITER: 360000
+  STEPS: [0, 240000, 320000]
 RPN:
   SIZES: (32, 64, 128, 256, 512)
 FAST_RCNN:

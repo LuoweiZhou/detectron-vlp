@@ -2,6 +2,7 @@ MODEL:
   TYPE: keypoint_rcnn
   CONV_BODY: FPN.add_fpn_ResNet50_conv5_body
   NUM_CLASSES: 2
+  ATTR: False
   KEYPOINTS_ON: True
 NUM_GPUS: 8
 SOLVER:

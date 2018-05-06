@@ -131,10 +131,6 @@ def add_fast_rcnn_blobs(blobs, im_scales, roidb):
                 if cfg.MODEL.CLS_EMBED:
                     blobs['labels_int32_fg'] = labels_int32_fg
 
-    # if blobs['fg_idx'].shape[0] != blobs['attr_labels_int32'].shape[0]:
-    #     import pdb
-    #     pdb.set_trace()
-
     # Add FPN multilevel training RoIs, if configured
     if cfg.FPN.FPN_ON and cfg.FPN.MULTILEVEL_ROIS:
         _add_multilevel_rois(blobs)

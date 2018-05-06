@@ -2,6 +2,7 @@ MODEL:
   TYPE: retinanet
   CONV_BODY: FPN.add_fpn_ResNet101_conv5_body
   NUM_CLASSES: 81
+  ATTR: False
 NUM_GPUS: 8
 SOLVER:
   WEIGHT_DECAY: 0.0001

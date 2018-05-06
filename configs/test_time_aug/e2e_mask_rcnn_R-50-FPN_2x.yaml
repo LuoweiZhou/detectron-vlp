@@ -2,6 +2,7 @@ MODEL:
   TYPE: mask_rcnn
   CONV_BODY: FPN.add_fpn_ResNet50_conv5_body
   NUM_CLASSES: 81
+  ATTR: False
   FASTER_RCNN: True
   MASK_ON: True
 NUM_GPUS: 8

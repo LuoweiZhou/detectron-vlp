@@ -2,14 +2,15 @@ MODEL:
   TYPE: retinanet
   CONV_BODY: FPN.add_fpn_ResNet50_conv5_body
   NUM_CLASSES: 81
+  ATTR: False
 NUM_GPUS: 8
 SOLVER:
   WEIGHT_DECAY: 0.0001
   LR_POLICY: steps_with_decay
   BASE_LR: 0.01
   GAMMA: 0.1
-  MAX_ITER: 180000
-  STEPS: [0, 120000, 160000]
+  MAX_ITER: 90000
+  STEPS: [0, 60000, 80000]
 FPN:
   FPN_ON: True
   MULTILEVEL_RPN: True
