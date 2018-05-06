@@ -1,0 +1,35 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Shared objects
+*.so
+
+# Distribution / packaging
+lib/build/
+*.egg-info/
+*.egg
+
+# Temporary files
+*.swn
+*.swo
+*.swp
+
+# Output files
+*-output.jpg
+*-output.pdf
+
+# Dataset symlinks
+lib/datasets/data/*
+!lib/datasets/data/README.md
+
+# Generated C files
+lib/utils/cython_*.c
+
+# Dropbox files
+*.dropbox.attr
+
+# Mac files
+*.DS_Store
+
