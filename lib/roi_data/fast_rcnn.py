@@ -48,7 +48,7 @@ def get_fast_rcnn_blob_names(is_training=True):
         # foreground classes plus background
         blob_names += ['labels_int32']
     # add attributes
-    if is_training:
+    if is_training and cfg.MODEL.ATTR:
         blob_names += ['attr_labels_int32']
         blob_names += ['fg_idx']
         if cfg.MODEL.CLS_EMBED:
@@ -123,7 +123,7 @@ def add_fast_rcnn_blobs(blobs, im_scales, roidb):
     for k, v in blobs.items():
         if isinstance(v, list) and len(v) > 0:
             blobs[k] = np.concatenate(v)
-            if k == 'labels_int32':
+            if cfg.MODEL.ATTR and k == 'labels_int32':
                 # we also add additional things to deal with attributes
                 fg_idx = np.where(blobs[k] > 0)[0]
                 labels_int32_fg = blobs[k][fg_idx]
@@ -154,7 +154,6 @@ def _sample_rois(roidb, im_scale, batch_idx):
     """
     rois_per_image = int(cfg.TRAIN.BATCH_SIZE_PER_IM)
     fg_rois_per_image = int(np.round(cfg.TRAIN.FG_FRACTION * rois_per_image))
-    # make sure we have enough number of attributes
     max_overlaps = roidb['max_overlaps']
 
     # Select foreground RoIs as those with >= FG_THRESH overlap
@@ -190,12 +189,13 @@ def _sample_rois(roidb, im_scale, batch_idx):
     sampled_labels[fg_rois_per_this_image:] = 0  # Label bg RoIs with class 0
     sampled_boxes = roidb['boxes'][keep_inds]
     # deal with attributes
-    gt_attr_inds = np.where(roidb['gt_classes'] > 0)[0]
-    gt_attributes = roidb['gt_attributes'][gt_attr_inds, :]
-    # we only care about foreground
-    gt_attr_assignments = gt_attr_inds[roidb['box_to_gt_ind_map'][fg_inds]]
-    # just paste it there
-    attr_labels_int32 = gt_attributes[gt_attr_assignments, :]
+    if cfg.MODEL.ATTR:
+        gt_attr_inds = np.where(roidb['gt_classes'] > 0)[0]
+        gt_attributes = roidb['gt_attributes'][gt_attr_inds, :]
+        # we only care about foreground
+        gt_attr_assignments = gt_attr_inds[roidb['box_to_gt_ind_map'][fg_inds]]
+        # just paste it there
+        attr_labels_int32 = gt_attributes[gt_attr_assignments, :]
 
     if 'bbox_targets' not in roidb:
         gt_inds = np.where(roidb['gt_classes'] > 0)[0]
@@ -219,14 +219,23 @@ def _sample_rois(roidb, im_scale, batch_idx):
     sampled_rois = np.hstack((repeated_batch_idx, sampled_rois))
 
     # Base Fast R-CNN blobs
-    blob_dict = dict(
-        labels_int32=sampled_labels.astype(np.int32, copy=False),
-        attr_labels_int32=attr_labels_int32,
-        rois=sampled_rois,
-        bbox_targets=bbox_targets,
-        bbox_inside_weights=bbox_inside_weights,
-        bbox_outside_weights=bbox_outside_weights
-    )
+    if cfg.MODEL.ATTR:
+        blob_dict = dict(
+            labels_int32=sampled_labels.astype(np.int32, copy=False),
+            attr_labels_int32=attr_labels_int32,
+            rois=sampled_rois,
+            bbox_targets=bbox_targets,
+            bbox_inside_weights=bbox_inside_weights,
+            bbox_outside_weights=bbox_outside_weights
+        )
+    else:
+        blob_dict = dict(
+            labels_int32=sampled_labels.astype(np.int32, copy=False),
+            rois=sampled_rois,
+            bbox_targets=bbox_targets,
+            bbox_inside_weights=bbox_inside_weights,
+            bbox_outside_weights=bbox_outside_weights
+        )
 
     # Optionally add Mask R-CNN blobs
     if cfg.MODEL.MASK_ON:

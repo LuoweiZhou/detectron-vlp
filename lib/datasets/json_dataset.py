@@ -83,8 +83,9 @@ class JsonDataset(object):
             for k, v in self.json_category_id_to_contiguous_id.items()
         }
         self._init_keypoints()
-        self.num_attributes = 400
-        self.max_attr_per_ins = 16
+        if cfg.MODEL.ATTR:
+            self.num_attributes = 400
+            self.max_attr_per_ins = 16
 
     def get_roidb(
         self,
@@ -149,7 +150,8 @@ class JsonDataset(object):
         entry['segms'] = []
         entry['gt_classes'] = np.empty((0), dtype=np.int32)
         # add attributes
-        entry['gt_attributes'] = np.empty((0, self.max_attr_per_ins), dtype=np.int32)
+        if cfg.MODEL.ATTR:
+            entry['gt_attributes'] = np.empty((0, self.max_attr_per_ins), dtype=np.int32)
         entry['seg_areas'] = np.empty((0), dtype=np.float32)
         entry['gt_overlaps'] = scipy.sparse.csr_matrix(
             np.empty((0, self.num_classes), dtype=np.float32)
@@ -202,7 +204,8 @@ class JsonDataset(object):
         boxes = np.zeros((num_valid_objs, 4), dtype=entry['boxes'].dtype)
         gt_classes = np.zeros((num_valid_objs), dtype=entry['gt_classes'].dtype)
         # initialize with ignore label
-        gt_attributes = -np.ones((num_valid_objs, self.max_attr_per_ins), 
+        if cfg.MODEL.ATTR:
+            gt_attributes = -np.ones((num_valid_objs, self.max_attr_per_ins), 
                                 dtype=entry['gt_attributes'].dtype)
         gt_overlaps = np.zeros(
             (num_valid_objs, self.num_classes),
@@ -238,7 +241,7 @@ class JsonDataset(object):
             else:
                 gt_overlaps[ix, cls] = 1.0
             # add attributes
-            if 'attribute_ids' in obj.keys():
+            if cfg.MODEL.ATTR and 'attribute_ids' in obj.keys():
                 assert len(obj['attribute_ids']) < self.max_attr_per_ins
                 assert max(obj['attribute_ids']) < self.num_attributes
                 assert min(obj['attribute_ids']) >= 0
@@ -253,7 +256,8 @@ class JsonDataset(object):
         #     entry['boxes'], boxes.astype(np.int).astype(np.float), axis=0)
         entry['gt_classes'] = np.append(entry['gt_classes'], gt_classes)
         # add attributes
-        entry['gt_attributes'] = np.append(entry['gt_attributes'], gt_attributes, axis=0)
+        if cfg.MODEL.ATTR:
+            entry['gt_attributes'] = np.append(entry['gt_attributes'], gt_attributes, axis=0)
 
         entry['seg_areas'] = np.append(entry['seg_areas'], seg_areas)
         entry['gt_overlaps'] = np.append(

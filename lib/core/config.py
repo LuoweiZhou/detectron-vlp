@@ -478,6 +478,8 @@ __C.MODEL.RPN_ONLY = False
 # Use 'prof_dag' to get profiling statistics
 __C.MODEL.EXECUTION_TYPE = b'dag'
 
+__C.MODEL.ATTR = True
+
 # Whether to add the labels
 __C.MODEL.CLS_EMBED = True
 

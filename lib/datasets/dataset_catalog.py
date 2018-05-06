@@ -203,5 +203,23 @@ DATASETS = {
             _DATA_DIR + '/visualgenome/images',
         ANN_FN:
             _DATA_DIR + '/visualgenome/annotations/object_and_attributes_test.json',
+    },
+    'ade_train_5': {
+        IM_DIR:
+            _DATA_DIR + '/ade/images',
+        ANN_FN:
+            _DATA_DIR + '/ade/annotations/ade_train_5_gt.json'
+    },
+    'ade_mval_5': {
+        IM_DIR:
+            _DATA_DIR + '/ade/images',
+        ANN_FN:
+            _DATA_DIR + '/ade/annotations/ade_mval_5_gt.json'
+    },
+    'ade_mtest_5': {
+        IM_DIR:
+            _DATA_DIR + '/ade/images',
+        ANN_FN:
+            _DATA_DIR + '/ade/annotations/ade_mtest_5_gt.json'
     }
 }

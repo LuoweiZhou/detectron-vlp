@@ -70,35 +70,36 @@ def add_fast_rcnn_outputs(model, blob_in, dim):
         bias_init=const_fill(0.0)
     )
 
-    in_dim = cfg.FAST_RCNN.MLP_HEAD_DIM
-    if cfg.MODEL.CLS_EMBED:
-        # first slice the fc7 feature
-        model.net.SelectFG([blob_in, 'fg_idx'], 'fc7_fg')
-        model.create_param(param_name='class_embedding',
-                           initializer=initializers.Initializer("GaussianFill", std=0.01),
-                           shape=[model.num_classes, 256])
-        # op that just takes the class index and returns the corresponding row
-        model.net.Embed(['class_embedding', 'labels_int32_fg'], 'embed_fg')
-        # then do concatenation
-        model.net.Concat(['fc7_fg','embed_fg'],
-                        ['concat_attr', 'concat_split'], axis=1)
-        in_dim += 256
-    else:
-        model.net.SelectFG([blob_in, 'fg_idx'], 'concat_attr')
+    if cfg.MODEL.ATTR:
+        in_dim = cfg.FAST_RCNN.MLP_HEAD_DIM
+        if cfg.MODEL.CLS_EMBED:
+            # first slice the fc7 feature
+            model.net.SelectFG([blob_in, 'fg_idx'], 'fc7_fg')
+            model.create_param(param_name='class_embedding',
+                               initializer=initializers.Initializer("GaussianFill", std=0.01),
+                               shape=[model.num_classes, 256])
+            # op that just takes the class index and returns the corresponding row
+            model.net.Embed(['class_embedding', 'labels_int32_fg'], 'embed_fg')
+            # then do concatenation
+            model.net.Concat(['fc7_fg','embed_fg'],
+                            ['concat_attr', 'concat_split'], axis=1)
+            in_dim += 256
+        else:
+            model.net.SelectFG([blob_in, 'fg_idx'], 'concat_attr')
 
-    model.FC('concat_attr',
-            'fc_attr',
-            in_dim,
-            512,
-            weight_init=gauss_fill(0.01),
-            bias_init=const_fill(0.0))
-    model.Relu('fc_attr', 'fc_attr')
-    model.FC('fc_attr',
-            'attr_score',
-            512,
-            model.num_attributes,
-            weight_init=gauss_fill(0.01),
-            bias_init=const_fill(0.0))
+        model.FC('concat_attr',
+                'fc_attr',
+                in_dim,
+                512,
+                weight_init=gauss_fill(0.01),
+                bias_init=const_fill(0.0))
+        model.Relu('fc_attr', 'fc_attr')
+        model.FC('fc_attr',
+                'attr_score',
+                512,
+                model.num_attributes,
+                weight_init=gauss_fill(0.01),
+                bias_init=const_fill(0.0))
 
 def add_fast_rcnn_losses(model):
     """Add losses for RoI classification and bounding box regression."""
@@ -107,12 +108,13 @@ def add_fast_rcnn_losses(model):
         scale=model.GetLossScale()
     )
     # add attribute loss
-    attr_prob, loss_attr = model.net.SoftmaxAttr(
-        ['attr_score', 'attr_labels_int32'],
-        ['attr_prob', 'loss_attr'],
-        scale=model.GetLossScale() * cfg.MODEL.LOSS_ATTR,
-        ignore=-1
-    )
+    if cfg.MODEL.ATTR:
+        attr_prob, loss_attr = model.net.SoftmaxAttr(
+            ['attr_score', 'attr_labels_int32'],
+            ['attr_prob', 'loss_attr'],
+            scale=model.GetLossScale() * cfg.MODEL.LOSS_ATTR,
+            ignore=-1
+        )
     loss_bbox = model.net.SmoothL1Loss(
         [
             'bbox_pred', 'bbox_targets', 'bbox_inside_weights',
@@ -121,9 +123,14 @@ def add_fast_rcnn_losses(model):
         'loss_bbox',
         scale=model.GetLossScale()
     )
-    loss_gradients = blob_utils.get_loss_gradients(model, [loss_cls, loss_attr, loss_bbox])
+    if cfg.MODEL.ATTR:
+        loss_gradients = blob_utils.get_loss_gradients(model, [loss_cls, loss_attr, loss_bbox])
+        model.AddLosses(['loss_cls', 'loss_attr', 'loss_bbox'])
+    else:
+        loss_gradients = blob_utils.get_loss_gradients(model, [loss_cls, loss_bbox])
+        model.AddLosses(['loss_cls', 'loss_bbox'])
+
     model.Accuracy(['cls_prob', 'labels_int32'], 'accuracy_cls')
-    model.AddLosses(['loss_cls', 'loss_attr', 'loss_bbox'])
     model.AddMetrics('accuracy_cls')
     return loss_gradients
 
