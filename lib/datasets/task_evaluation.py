@@ -39,15 +39,123 @@ from collections import OrderedDict
 import logging
 import os
 import pprint
+import numpy as np
 
 from core.config import cfg
 from utils.logging import send_email
 import datasets.cityscapes_json_dataset_evaluator as cs_json_dataset_evaluator
 import datasets.json_dataset_evaluator as json_dataset_evaluator
 import datasets.voc_dataset_evaluator as voc_dataset_evaluator
+from datasets.voc_eval import voc_ap
 
 logger = logging.getLogger(__name__)
 
+def _rc_score(all_scores, gt_classes):
+    scs = [0.] * cfg.MODEL.NUM_CLASSES
+    scs_all = [0.] * cfg.MODEL.NUM_CLASSES
+    valid = [0] * cfg.MODEL.NUM_CLASSES
+    for i in range(1, cfg.MODEL.NUM_CLASSES):
+      ind_this = np.where(gt_classes == i)[0]  
+      scs_all[i] = np.sum(all_scores[ind_this, i])
+      if ind_this.shape[0] > 0:
+        valid[i] = ind_this.shape[0]
+        scs[i] = scs_all[i] / ind_this.shape[0]
+
+    mcls_sc = np.mean([s for s, v in zip(scs,valid) if v])
+    mins_sc = np.sum(scs_all) / gt_classes.shape[0]
+    return scs[1:], mcls_sc, mins_sc, valid[1:]
+
+def _rc_accuracy(all_scores, gt_classes):
+    acs = [0.] * cfg.MODEL.NUM_CLASSES
+    acs_all = [0.] * cfg.MODEL.NUM_CLASSES
+    valid = [0] * cfg.MODEL.NUM_CLASSES
+
+    # Need to remove the background class
+    max_inds = np.argmax(all_scores[:, 1:], axis=1) + 1
+    max_scores = np.empty_like(all_scores)
+    max_scores[:] = 0.
+    max_scores[np.arange(gt_classes.shape[0]), max_inds] = 1.
+
+    for i in range(1, cfg.MODEL.NUM_CLASSES):
+      ind_this = np.where(gt_classes == i)[0]
+      acs_all[i] = np.sum(max_scores[ind_this, i])
+      if ind_this.shape[0] > 0:
+        valid[i] = ind_this.shape[0]
+        acs[i] = acs_all[i] / ind_this.shape[0]
+
+    mcls_ac = np.mean([s for s, v in zip(acs,valid) if v])
+    mins_ac = np.sum(acs_all) / gt_classes.shape[0]
+    return acs[1:], mcls_ac, mins_ac
+
+def _rc_average_precision(all_scores, gt_classes):
+    aps = [0.] * cfg.MODEL.NUM_CLASSES
+    valid = [0] * cfg.MODEL.NUM_CLASSES
+
+    ind_all = np.arange(gt_classes.shape[0])
+    num_cls = cfg.MODEL.NUM_CLASSES
+    num_ins = ind_all.shape[0]
+
+    for i in range(num_cls):
+      if i == 0:
+        continue
+      gt_this = (gt_classes == i).astype(np.float32)
+      num_this = np.sum(gt_this)
+      if num_this > 0:
+        valid[i] = num_this
+        sco_this = all_scores[ind_all, i]
+
+        ind_sorted = np.argsort(-sco_this)
+
+        tp = gt_this[ind_sorted]
+        max_ind = num_ins - np.argmax(tp[::-1])
+        tp = tp[:max_ind]
+        fp = 1. - tp
+
+        tp = np.cumsum(tp)
+        fp = np.cumsum(fp)
+        rec = tp / float(num_this)
+        prec = tp / np.maximum(tp + fp, np.finfo(np.float64).eps)
+
+        aps[i] = voc_ap(rec, prec)
+
+    mcls_ap = np.mean([s for s, v in zip(aps,valid) if v])
+
+    # Compute the overall score
+    max_inds = np.argmax(all_scores[:, 1:], axis=1) + 1
+    max_scores = np.empty_like(all_scores)
+    max_scores[:] = 0.
+    max_scores[ind_all, max_inds] = 1.
+    pred_all = max_scores[ind_all, gt_classes]
+    sco_all = all_scores[ind_all, gt_classes]
+    ind_sorted = np.argsort(-sco_all)
+
+    tp = pred_all[ind_sorted]
+    fp = 1. - tp
+
+    tp = np.cumsum(tp)
+    fp = np.cumsum(fp)
+    rec = tp / float(num_ins)
+    prec = tp / np.maximum(tp + fp, np.finfo(np.float64).eps)
+
+    mins_ap = voc_ap(rec, prec)
+    return aps[1:], mcls_ap, mins_ap
+
+def evaluate_scores(dataset, all_scores, output_dir):
+    logger.info('Evaluating classifications')
+    roidb = dataset.get_roidb(gt=True)
+    all_scores = np.vstack(all_scores)
+    shapes = [aa.shape[0] for aa in all_scores]
+    gt_classes = np.hstack([r['gt_classes'] for r in roidb])
+    scs, mcls_sc, mins_sc, valid = _rc_score(all_scores, gt_classes)
+    acs, mcls_ac, mins_ac = _rc_accuracy(all_scores, gt_classes)
+    aps, mcls_ap, mins_ap = _rc_average_precision(all_scores, gt_classes)
+    score_results = _rc_score_results(mcls_sc, 
+                                      mcls_ac, 
+                                      mcls_ap, 
+                                      mins_sc, 
+                                      mins_ac, 
+                                      mins_ap)
+    return OrderedDict([(dataset.name, score_results)])
 
 def evaluate_all(
     dataset, all_boxes, all_segms, all_keyps, output_dir, use_matlab=False
@@ -272,6 +380,26 @@ COCO_KPS_APL = 4
 # ---------------------------------------------------------------------------- #
 # Helper functions for producing properly formatted results.
 # ---------------------------------------------------------------------------- #
+
+def _rc_score_results(mcls_sc, 
+                      mcls_ac, 
+                      mcls_ap, 
+                      mins_sc, 
+                      mins_ac, 
+                      mins_ap):
+    return OrderedDict({
+        'classification':
+        OrderedDict(
+            [
+                ('mcls_sc', mcls_sc),
+                ('mcls_ac', mcls_ac),
+                ('mcls_ap', mcls_ap),
+                ('mins_sc', mins_sc),
+                ('mins_ac', mins_ac),
+                ('mins_ap', mins_ap),
+            ]
+        )
+    })
 
 def _coco_eval_to_box_results(coco_eval):
     res = _empty_box_results()

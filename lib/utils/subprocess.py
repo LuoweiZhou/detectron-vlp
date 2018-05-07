@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 def process_in_parallel(
-    tag, total_range_size, binary, output_dir, opts=''
+    tag, total_range_size, binary, output_dir, weights_file, opts=''
 ):
     """Run the specified binary cfg.NUM_GPUS times in parallel, each time as a
     subprocess that uses one GPU. The binary must accept the command line
@@ -45,7 +45,8 @@ def process_in_parallel(
     """
     # Snapshot the current cfg state in order to pass to the inference
     # subprocesses
-    cfg_file = os.path.join(output_dir, '{}_range_config.yaml'.format(tag))
+    cfg_file = os.path.join(output_dir, '{}.yaml'.format(tag))
+
     with open(cfg_file, 'w') as f:
         yaml.dump(cfg, stream=f)
     subprocess_env = os.environ.copy()
@@ -64,12 +65,13 @@ def process_in_parallel(
         start = subinds[i][0]
         end = subinds[i][-1] + 1
         subprocess_env['CUDA_VISIBLE_DEVICES'] = str(gpu_ind)
-        cmd = '{binary} --range {start} {end} --cfg {cfg_file} NUM_GPUS 1 {opts}'
+        cmd = '{binary} --range {start} {end} --cfg {cfg_file} --weights {weights} --multi-gpu-testing False {opts}'
         cmd = cmd.format(
             binary=shlex_quote(binary),
             start=int(start),
             end=int(end),
             cfg_file=shlex_quote(cfg_file),
+            weights=shlex_quote(weights_file),
             opts=' '.join([shlex_quote(opt) for opt in opts])
         )
         logger.info('{} range command {}: {}'.format(tag, i, cmd))

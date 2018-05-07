@@ -1,9 +1,9 @@
 for times in 0.5 1 2; do
     for rng_seed in 3 227 1989; do
-        ~/devfair/starter.sh 8 1 72 learnfair vqa train_net --cfg configs/ade/e2e_faster_rcnn_R-101-FPN_${times}x.yaml RNG_SEED $rng_seed
-        ~/devfair/starter.sh 8 1 72 learnfair vqa train_net --cfg configs/ade/e2e_faster_rcnn_R-50-FPN_${times}x.yaml RNG_SEED $rng_seed
-        ~/devfair/starter.sh 8 1 72 learnfair vqa train_net --cfg configs/ade/e2e_faster_rcnn_X-101-32x8d-FPN_${times}x.yaml RNG_SEED $rng_seed
-        ~/devfair/starter.sh 8 1 72 learnfair vqa train_net --cfg configs/ade/e2e_faster_rcnn_X-101-64x4d-FPN_${times}x.yaml RNG_SEED $rng_seed
+        ~/devfair/starter.sh 8 1 72 learnfair vqa train_net --cfg configs/coco/rc_R-101-FPN_${times}x.yaml RNG_SEED $rng_seed
+        ~/devfair/starter.sh 8 1 72 learnfair vqa train_net --cfg configs/coco/rc_R-50-FPN_${times}x.yaml RNG_SEED $rng_seed
+        ~/devfair/starter.sh 8 1 72 learnfair vqa train_net --cfg configs/coco/rc_X-101-32x8d-FPN_${times}x.yaml RNG_SEED $rng_seed
+        ~/devfair/starter.sh 8 1 72 learnfair vqa train_net --cfg configs/coco/rc_X-101-64x4d-FPN_${times}x.yaml RNG_SEED $rng_seed
     done
 done
 

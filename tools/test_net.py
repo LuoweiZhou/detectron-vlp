@@ -36,7 +36,6 @@ from core.config import assert_and_infer_cfg
 from core.config import cfg
 from core.config import merge_cfg_from_file
 from core.config import merge_cfg_from_list
-from core.test_engine import run_inference
 import utils.c2
 import utils.logging
 
@@ -52,6 +51,13 @@ def parse_args():
         '--cfg',
         dest='cfg_file',
         help='optional config file',
+        default=None,
+        type=str
+    )
+    parser.add_argument(
+        '--weights',
+        dest='weights',
+        help='optional weights file',
         default=None,
         type=str
     )
@@ -108,16 +114,28 @@ if __name__ == '__main__':
         for opt in args.opts[1:]:
             cfg.CFG_OPTS += split + opt
             split = '#' if split == '_' else '_'
+    if not args.multi_gpu_testing:
+        cfg.NUM_GPUS = 1
     assert_and_infer_cfg()
     logger.info('Testing with config:')
     logger.info(pprint.pformat(cfg))
 
-    while not os.path.exists(cfg.TEST.WEIGHTS) and args.wait:
-        logger.info('Waiting for \'{}\' to exist...'.format(cfg.TEST.WEIGHTS))
+    if args.weights is not None:
+        weights = args.weights
+    else:
+        weights = cfg.TEST.WEIGHTS
+
+    while not os.path.exists(weights) and args.wait:
+        logger.info('Waiting for \'{}\' to exist...'.format(weights))
         time.sleep(10)
 
+    if cfg.MODEL.RC:
+        from core.test_engine_rc import run_inference
+    else:
+        from core.test_engine import run_inference
+
     run_inference(
-        cfg.TEST.WEIGHTS,
+        weights,
         ind_range=args.range,
         multi_gpu_testing=args.multi_gpu_testing,
         check_expected_results=True,

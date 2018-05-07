@@ -37,7 +37,6 @@ from core.config import assert_and_infer_cfg
 from core.config import cfg
 from core.config import merge_cfg_from_file
 from core.config import merge_cfg_from_list
-from core.test_engine import run_inference
 from utils.logging import setup_logging
 import utils.c2
 import utils.train
@@ -126,7 +125,13 @@ def test_model(model_file, multi_gpu_testing, opts=None):
     """Test a model."""
     # Clear memory before inference
     workspace.ResetWorkspace()
+    if cfg.MODEL.RC:
+        from core.test_engine_rc import run_inference
+    else:
+        from core.test_engine import run_inference
     # Run inference
+    if cfg.NUM_GPUS == 1:
+        multi_gpu_testing = False
     run_inference(
         model_file, multi_gpu_testing=multi_gpu_testing,
         check_expected_results=True,

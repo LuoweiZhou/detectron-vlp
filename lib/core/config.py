@@ -1071,7 +1071,7 @@ def assert_and_infer_cfg(cache_urls=True, make_immutable=True):
     """
     if __C.MODEL.RPN_ONLY or __C.MODEL.FASTER_RCNN:
         __C.RPN.RPN_ON = True
-    if __C.RPN.RPN_ON or __C.RETINANET.RETINANET_ON:
+    if __C.RPN.RPN_ON or __C.RETINANET.RETINANET_ON or __C.MODEL.RC:
         __C.TEST.PRECOMPUTED_PROPOSALS = False
     if cache_urls:
         cache_cfg_urls()
