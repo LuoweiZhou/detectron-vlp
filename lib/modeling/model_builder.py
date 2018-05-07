@@ -456,6 +456,11 @@ def add_training_inputs(model, roidb=None):
             model.net.DequeueBlobs(
                 model.roi_data_loader._blobs_queue_name, blob_names
             )
+            if gpu_id == 0:
+                image_blob_name = core.ScopedName('data')
+                rois_name = core.ScopedName('rois')
+                # model.AddSummaryImage(image_blob_name)
+                model.AddSummaryImageBoxes(image_blob_name, rois_name)
     # A little op surgery to move input ops to the start of the net
     diff = len(model.net._net.op) - orig_num_op
     new_op = model.net._net.op[-diff:] + model.net._net.op[:-diff]

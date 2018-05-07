@@ -26,6 +26,7 @@ import logging
 import numpy as np
 import os
 import pprint
+import re
 import yaml
 
 from caffe2.python import core
@@ -35,7 +36,18 @@ from utils.io import save_object
 import utils.c2 as c2_utils
 
 logger = logging.getLogger(__name__)
+matches = [r"^(fpn_)", r"^(res2_)", r"^(res3_)", 
+            r"^(res4_)", r"^(res5_)", r"^(retnet_)"]
+matches = [re.compile(m) for m in matches]
+replaces = [b"fpn/", b"res2/", b"res3/", b"res4/", b"res5/", b"retnet/"]
+assert len(matches) == len(replaces)
 
+def scope_function(name):
+    # X: change the names so that they look better in tensorboard graph
+    new_name = name
+    for match, replace in zip(matches, replaces):
+        new_name = match.sub(replace, new_name)
+    return new_name
 
 def initialize_from_weights_file(model, weights_file, broadcast=True):
     """Initialize a model from weights stored in a pickled dictionary. If

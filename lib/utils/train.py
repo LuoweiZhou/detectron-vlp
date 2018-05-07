@@ -83,6 +83,7 @@ def train_model():
             training_stats.ResetIterTimer()
 
         if np.isnan(training_stats.iter_total_loss):
+            training_stats.LogIterStats(cur_iter, lr, nan=True)
             logger.critical('Loss is NaN, exiting...')
             model.roi_data_loader.shutdown()
             envu.exit_on_error()

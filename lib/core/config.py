@@ -987,6 +987,8 @@ __C.EXPECTED_RESULTS_EMAIL = b''
 # specified by DOWNLOAD_CACHE
 __C.DOWNLOAD_CACHE = b'outputs/detectron-download-cache'
 
+__C.TF_PERIOD = 180
+
 
 # ---------------------------------------------------------------------------- #
 # Cluster options

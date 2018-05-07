@@ -73,7 +73,7 @@ def add_rc_blobs(blobs, im_scales, roidb):
     if cfg.FPN.FPN_ON and cfg.FPN.MULTILEVEL_ROIS:
         _add_multilevel_rois(blobs)
 
-    return valid
+    return True
 
 
 def _get_gt_rois(roidb, im_scale, batch_idx):
@@ -82,7 +82,7 @@ def _get_gt_rois(roidb, im_scale, batch_idx):
     gt_inds = np.where(roidb['gt_classes'] > 0)[0]
     # just get all the labels
     sampled_labels = roidb['gt_classes'][gt_inds]
-    sampled_rois = roidb['boxes'][gt_inds, :]
+    sampled_boxes = roidb['boxes'][gt_inds, :]
 
     # Scale rois and format as (batch_idx, x1, y1, x2, y2)
     sampled_rois = sampled_boxes * im_scale

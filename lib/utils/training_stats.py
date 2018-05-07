@@ -23,7 +23,9 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import datetime
+from numbers import Number
 import numpy as np
+import six
 
 from caffe2.python import utils as c2_py_utils
 from core.config import cfg
@@ -41,6 +43,7 @@ class TrainingStats(object):
         self.WIN_SZ = 20
         # Output logging period in SGD iterations
         self.LOG_PERIOD = 20
+        self.LOG_SLOW_PERIOD = cfg.TF_PERIOD
         self.smoothed_losses_and_metrics = {
             key: SmoothedValue(self.WIN_SZ)
             for key in model.losses + model.metrics
@@ -54,6 +57,7 @@ class TrainingStats(object):
         self.iter_total_loss = np.nan
         self.iter_timer = Timer()
         self.model = model
+        self.writer = model.writer
 
     def IterTic(self):
         self.iter_timer.tic()
@@ -81,12 +85,18 @@ class TrainingStats(object):
             self.model.roi_data_loader._minibatch_queue.qsize()
         )
 
-    def LogIterStats(self, cur_iter, lr):
+    def LogIterStats(self, cur_iter, lr, nan=False):
         """Log the tracked statistics."""
-        if (cur_iter % self.LOG_PERIOD == 0 or
-                cur_iter == cfg.SOLVER.MAX_ITER - 1):
+        if cur_iter % self.LOG_PERIOD == 0 or cur_iter == cfg.SOLVER.MAX_ITER - 1 or nan:
             stats = self.GetStats(cur_iter, lr)
             log_json_stats(stats)
+            # X: first dump the statistics
+            dump_stats = {key.replace('retnet_', 'retnet/'): val for key, val in six.iteritems(stats) \
+                         if isinstance(val, Number)}
+            self.writer.write_scalars(dump_stats, cur_iter)
+
+        if cur_iter % self.LOG_SLOW_PERIOD == 0 and not nan:
+            self.writer.write_summaries(cur_iter)
 
     def GetStats(self, cur_iter, lr):
         eta_seconds = self.iter_timer.average_time * (
