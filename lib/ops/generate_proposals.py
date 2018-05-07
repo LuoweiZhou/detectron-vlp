@@ -103,9 +103,7 @@ class GenerateProposalsOp(object):
             outputs[1].reshape(roi_probs.shape)
             outputs[1].data[...] = roi_probs
 
-    def proposals_for_one_image(
-        self, im_info, all_anchors, bbox_deltas, scores
-    ):
+    def proposals_for_one_image(self, im_info, all_anchors, bbox_deltas, scores):
         # Get mode-dependent configuration
         cfg_key = 'TRAIN' if self._train else 'TEST'
         pre_nms_topN = cfg[cfg_key].RPN_PRE_NMS_TOP_N

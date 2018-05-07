@@ -36,6 +36,7 @@ from core.config import cfg
 import roi_data.fast_rcnn
 import roi_data.retinanet
 import roi_data.rpn
+import roi_data.rc
 import utils.blob as blob_utils
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,9 @@ def get_minibatch_blob_names(is_training=True):
     """
     # data blob: holds a batch of N images, each with 3 channels
     blob_names = ['data']
-    if cfg.RPN.RPN_ON:
+    if cfg.MODEL.RC:
+        blob_names += roi_data.rc.get_rc_blob_names(is_training=is_training)
+    elif cfg.RPN.RPN_ON:
         # RPN-only or end-to-end Faster R-CNN
         blob_names += roi_data.rpn.get_rpn_blob_names(is_training=is_training)
     elif cfg.RETINANET.RETINANET_ON:
@@ -69,7 +72,9 @@ def get_minibatch(roidb):
     # Get the input image blob, formatted for caffe2
     im_blob, im_scales = _get_image_blob(roidb)
     blobs['data'] = im_blob
-    if cfg.RPN.RPN_ON:
+    if cfg.MODEL.RC:
+        valid = roi_data.rc.add_rc_blobs(blobs, im_scales, roidb)
+    elif cfg.RPN.RPN_ON:
         # RPN-only or end-to-end Faster/Mask R-CNN
         valid = roi_data.rpn.add_rpn_blobs(blobs, im_scales, roidb)
     elif cfg.RETINANET.RETINANET_ON:

@@ -34,11 +34,12 @@ import numpy as np
 import os
 import re
 
+from c2board.writer import SummaryWriter
 from caffe2.python import memonger
 from caffe2.python import workspace
 
 from core.config import cfg
-from core.config import get_output_dir
+from core.config import get_output_dir, get_tb_dir
 from datasets.roidb import combined_roidb_for_training
 from modeling import model_builder
 from utils import lr_policy
@@ -50,12 +51,13 @@ import utils.net as nu
 def train_model():
     """Model training loop."""
     logger = logging.getLogger(__name__)
-    model, weights_file, start_iter, checkpoints, output_dir = create_model()
+    model, weights_file, start_iter, checkpoints, output_dir, writer = create_model()
     if 'final' in checkpoints:
         # The final model was found in the output directory, so nothing to do
         return checkpoints
 
     setup_model_for_training(model, weights_file, output_dir)
+    writer.write_graph(model, single_gpu=True, custom_rename=nu.scope_function)
     training_stats = TrainingStats(model)
     CHECKPOINT_PERIOD = int(cfg.TRAIN.SNAPSHOT_ITERS / cfg.NUM_GPUS)
 
@@ -90,6 +92,7 @@ def train_model():
     nu.save_model_to_weights_file(checkpoints['final'], model)
     # Shutdown data loading threads
     model.roi_data_loader.shutdown()
+    writer.close()
     return checkpoints
 
 
@@ -101,13 +104,15 @@ def create_model():
     start_iter = 0
     checkpoints = {}
     output_dir = get_output_dir(training=True)
+    tb_dir = get_tb_dir(training=True)
+    writer = SummaryWriter(tb_dir, tag="detectron")
     weights_file = cfg.TRAIN.WEIGHTS
     if cfg.TRAIN.AUTO_RESUME:
         # Check for the final model (indicates training already finished)
         final_path = os.path.join(output_dir, 'model_final.pkl')
         if os.path.exists(final_path):
             logger.info('model_final.pkl exists; no need to train!')
-            return None, None, None, {'final': final_path}, output_dir
+            return None, None, None, {'final': final_path}, output_dir, writer
 
         # Find the most recent checkpoint (highest iteration number)
         files = os.listdir(output_dir)
@@ -129,12 +134,12 @@ def create_model():
             )
 
     logger.info('Building model: {}'.format(cfg.MODEL.TYPE))
-    model = model_builder.create(cfg.MODEL.TYPE, train=True)
+    model = model_builder.create(cfg.MODEL.TYPE, train=True, writer=writer)
     if cfg.MEMONGER:
         optimize_memory(model)
     # Performs random weight initialization as defined by the model
     workspace.RunNetOnce(model.param_init_net)
-    return model, weights_file, start_iter, checkpoints, output_dir
+    return model, weights_file, start_iter, checkpoints, output_dir, writer
 
 
 def optimize_memory(model):

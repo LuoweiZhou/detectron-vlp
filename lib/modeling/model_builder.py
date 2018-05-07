@@ -99,12 +99,17 @@ def retinanet(model):
     # TODO(rbg): fold into build_generic_detection_model
     return build_generic_retinanet_model(model, get_func(cfg.MODEL.CONV_BODY))
 
+def region_classification(model):
+    # TODO(rbg): fold into build_generic_detection_model
+    return build_generic_rc_model(model, get_func(cfg.MODEL.CONV_BODY),
+                                add_roi_box_head_func=get_func(cfg.FAST_RCNN.ROI_BOX_HEAD))
+
 
 # ---------------------------------------------------------------------------- #
 # Helper functions for building various re-usable network bits
 # ---------------------------------------------------------------------------- #
 
-def create(model_type_func, train=False, gpu_id=0):
+def create(model_type_func, train=False, writer=None, gpu_id=0):
     """Generic model creation function that dispatches to specific model
     building functions.
 
@@ -122,6 +127,7 @@ def create(model_type_func, train=False, gpu_id=0):
     model.only_build_forward_pass = False
     model.target_gpu_id = gpu_id
     model.num_attributes = cfg.MODEL.NUM_ATTRIBUTES
+    model.writer = writer
     return get_func(model_type_func)(model)
 
 
@@ -230,6 +236,45 @@ def build_generic_detection_model(
     optim.build_data_parallel_model(model, _single_gpu_build_func)
     return model
 
+def build_generic_rc_model(
+    model, add_conv_body_func, 
+    add_roi_box_head_func, freeze_conv_body=False
+):
+    # TODO(rbg): fold this function into build_generic_detection_model
+    def _single_gpu_build_func(model):
+        """Builds the model on a single GPU. Can be called in a loop over GPUs
+        with name and device scoping to create a data parallel model."""
+        blob_conv, dim_conv, spatial_scale_conv = add_conv_body_func(model)
+
+        if not model.train:
+            model.conv_body_net = model.net.Clone('conv_body_net')
+
+        if cfg.FPN.FPN_ON:
+            # After adding the RPN head, restrict FPN blobs and scales to
+            # those used in the RoI heads
+            blob_conv, spatial_scale_conv = _narrow_to_fpn_roi_levels(
+                blob_conv, spatial_scale_conv
+            )
+
+        head_loss_gradients = {}
+        # Add the Fast R-CNN head
+        head_loss_gradients['box'] = _add_fast_rcnn_head_class_only(
+            model, add_roi_box_head_func, blob_conv, dim_conv,
+            spatial_scale_conv
+        )
+
+        if model.train:
+            loss_gradients = {}
+            for lg in head_loss_gradients.values():
+                if lg is not None:
+                    loss_gradients.update(lg)
+            return loss_gradients
+        else:
+            return None
+
+    optim.build_data_parallel_model(model, _single_gpu_build_func)
+    return model
+
 
 def _narrow_to_fpn_roi_levels(blobs, spatial_scales):
     """Return only the blobs and spatial scales that will be used for RoI heads.
@@ -257,6 +302,21 @@ def _add_fast_rcnn_head(
     fast_rcnn_heads.add_fast_rcnn_outputs(model, blob_frcn, dim_frcn)
     if model.train:
         loss_gradients = fast_rcnn_heads.add_fast_rcnn_losses(model)
+    else:
+        loss_gradients = None
+    return loss_gradients
+
+
+def _add_fast_rcnn_head_class_only(
+    model, add_roi_box_head_func, blob_in, dim_in, spatial_scale_in
+):
+    """Add a Fast R-CNN head to the model."""
+    blob_frcn, dim_frcn = add_roi_box_head_func(
+        model, blob_in, dim_in, spatial_scale_in
+    )
+    fast_rcnn_heads.add_fast_rcnn_outputs_class_only(model, blob_frcn, dim_frcn)
+    if model.train:
+        loss_gradients = fast_rcnn_heads.add_fast_rcnn_losses_class_only(model)
     else:
         loss_gradients = None
     return loss_gradients

@@ -478,13 +478,15 @@ __C.MODEL.RPN_ONLY = False
 # Use 'prof_dag' to get profiling statistics
 __C.MODEL.EXECUTION_TYPE = b'dag'
 
+# Options for attributes
 __C.MODEL.ATTR = True
-
 # Whether to add the labels
 __C.MODEL.CLS_EMBED = True
-
 # Loss for attributes
 __C.MODEL.LOSS_ATTR = 0.5
+
+# Whether to do GT region classification only
+__C.MODEL.RC = False
 
 
 # ---------------------------------------------------------------------------- #
@@ -951,6 +953,9 @@ __C.ROOT_DIR = os.getcwd()
 # Output basedir
 __C.OUTPUT_DIR = b'outputs'
 
+# Tensorboard basedir
+__C.TB_DIR = b'boards'
+
 # Name (or path to) the matlab executable
 __C.MATLAB = b'matlab'
 
@@ -1098,6 +1103,15 @@ def get_output_dir(training=True, weights=None):
     if not osp.exists(outdir):
         os.makedirs(outdir)
     return outdir
+
+def get_tb_dir(training=True):
+    """Get the tensorboard directory determined by the current global config."""
+    dataset = __C.TRAIN.DATASETS if training else __C.TEST.DATASETS
+    dataset = '+'.join(dataset)
+    tbdir = osp.join(__C.TB_DIR, dataset, __C.CFG_FILE, __C.CFG_OPTS)
+    if not osp.exists(tbdir):
+        os.makedirs(tbdir)
+    return tbdir
 
 
 def merge_cfg_from_file(cfg_filename):

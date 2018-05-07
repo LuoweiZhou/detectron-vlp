@@ -65,6 +65,209 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         self.prev_use_cudnn = self.use_cudnn
         self.gn_params = []  # Param on this list are GroupNorm parameters
 
+    def AddSummaryHistogram(self, blob_name):
+        if self.writer:
+            self.writer.append_histogram(blob_name)
+
+    def AddSummaryImage(self, blob_name):
+        if self.writer:
+            self.writer.append_image(blob_name)
+
+    def AddSummaryImageBoxes(self, im_name, box_name):
+        if self.writer:
+            self.writer.append_image_boxes(im_name, box_name)
+
+    def ResizeMemoryInit(self):
+
+        blobs_in = ['mem_00/spatial', 'im_info', cfg.MEM.REFER]
+        blobs_out = ['mem_00/values']
+        mem_init = self.net.ResizeMemoryInit(blobs_in, blobs_out, 
+                                        spatial_scale=cfg.MEM.SCALE)
+        if cfg.MEM.ACT == 'tanh':
+            return self.Tanh(mem_init, mem_init)
+        elif cfg.MEM.ACT == 'relu':
+            return mem_init
+        else:
+            raise NotImplementedError
+
+    def ResizeMemoryPyramidInit(self, fpn_blobs):
+        scale_inv = float((2 ** cfg.FPN.RPN_MAX_LEVEL))
+        mem_blobs = []
+        for i, fb in enumerate(fpn_blobs):
+            lvl = cfg.FPN.RPN_MAX_LEVEL - i
+            scale = 1. / scale_inv
+            assert str(lvl) in fb._name
+            blobs_in = ['mem_00/spatial', 'im_info', c2_utils.UnscopeTopName(fb._name)]
+            blobs_out = ['mem_00/values_%d' % lvl]
+            mem = self.net.ResizeMemoryInit(blobs_in, blobs_out, spatial_scale=scale)
+            mem_blobs.append(mem)
+            scale_inv /= 2.
+
+        return list(reversed(mem_blobs))
+
+    def ResizeNormalizerInit(self):
+
+        blobs_in = ['mem_00/spatial_normalizer', 'im_info', cfg.MEM.REFER]
+        blobs_out = ['mem_00/normalizer']
+        return self.net.ResizeMemoryInit(blobs_in, blobs_out, 
+                                        spatial_scale=cfg.MEM.SCALE,
+                                        e_value=1.)
+
+    def SumConvFC(self, blobs_in, blobs_out):
+        return self.net.SumConvFC(blobs_in, blobs_out)
+
+    def MulConvFC(self, blobs_in, blobs_out):
+        return self.net.MulConvFC(blobs_in, blobs_out)
+
+    def MulConvGate(self, blobs_in, blobs_out):
+        return self.net.MulConvGate(blobs_in, blobs_out)
+
+    def DivConvNorm(self, mem, norm):
+        blobs = [mem, norm]
+        blobs_in = [ c2_utils.UnscopeTopName(b._name) for b in blobs ]
+        dirname = osp.dirname(blobs_in[0])
+        blobs_out = [dirname + '/normalized_assemble']
+        return self.net.DivConvNorm(blobs_in, blobs_out)
+
+    def CropAndResize(self, rois, feats):
+        blobs = [feats, rois]
+        blobs_in = [ c2_utils.UnscopeTopName(b._name) for b in blobs ]
+
+        dirname = osp.dirname(blobs_in[1])
+        basename = osp.basename(blobs_in[0])
+        output_name = dirname + '/' + basename + '_crop'
+        blobs_out = [ output_name ]
+
+        return model.CropAndResize(blobs_in, 
+                                    blobs_out, 
+                                    spatial_scale=cfg.MEM.SCALE,
+                                    pooled_h=cfg.MEM.CROP_SIZE,
+                                    pooled_w=cfg.MEM.CROP_SIZE)
+
+    def InvCropAndResize(self, rois, feats, rfeats):
+        blobs = [feats, rois, rfeats]
+        blobs_in = [ c2_utils.UnscopeTopName(b._name) for b in blobs ]
+
+        dirname = osp.dirname(blobs_in[1])
+        basename = osp.basename(blobs_in[2])
+        output_name = dirname + '/' + basename + '_assemble'
+        blobs_out = [ output_name ]
+
+        return self.net.InvCropAndResize(
+                            blobs_in, 
+                            blobs_out, 
+                            spatial_scale=cfg.MEM.SCALE)
+
+    def RoIAlign(self, rois, feats):
+        blobs = [feats, rois]
+        blobs_in = [ c2_utils.UnscopeTopName(b._name) for b in blobs ]
+
+        dirname = osp.dirname(blobs_in[1])
+        basename = osp.basename(blobs_in[0])
+        output_name = dirname + '/' + basename + '_crop'
+        blobs_out = [ output_name ]
+
+        return self.net.RoIAlign(blobs_in, 
+                                blobs_out, 
+                                spatial_scale=cfg.MEM.SCALE,
+                                pooled_h=cfg.MEM.CROP_SIZE,
+                                pooled_w=cfg.MEM.CROP_SIZE,
+                                sampling_ratio=0)
+
+    def RoIAlignList(self, rois_list, feats_list):
+        crops = []
+        for lvl in range(cfg.FPN.RPN_MIN_LEVEL, cfg.FPN.RPN_MAX_LEVEL+1):
+            ind = lvl - cfg.FPN.RPN_MIN_LEVEL
+            blobs = [feats_list[ind], rois_list[ind]]
+            blobs_in = [ c2_utils.UnscopeTopName(b._name) for b in blobs ]
+            assert str(lvl) in blobs_in[0]
+            assert str(lvl) in blobs_in[1]
+            dirname = osp.dirname(blobs_in[1])
+            basename = osp.basename(blobs_in[0])
+            output_name = dirname + '/' + basename + '_crop'
+            blobs_out = [ output_name ]
+            scale = (0.5)**(lvl)
+            crops.append(self.net.RoIAlign(blobs_in, 
+                                            blobs_out, 
+                                            spatial_scale=scale,
+                                            pooled_h=cfg.MEM.CROP_SIZE,
+                                            pooled_w=cfg.MEM.CROP_SIZE,
+                                            sampling_ratio=0))
+
+        # combine features
+        crops = [ c2_utils.UnscopeTopName(b._name) for b in crops ]
+        dirname = osp.commonprefix(crops)
+        blobs_out = [dirname + 'crop', dirname + 'crop_split']
+        crop = self.net.Concat(crops, blobs_out, axis=0)
+
+        return crop[0]
+
+    def InvRoIAlign(self, rois, feats, rfeats):
+        blobs = [feats, rois, rfeats]
+        blobs_in = [ c2_utils.UnscopeTopName(b._name) for b in blobs ]
+
+        dirname = osp.dirname(blobs_in[1])
+        basename = osp.basename(blobs_in[2])
+        output_name = dirname + '/' + basename + '_assemble'
+        blobs_out = [ output_name ]
+
+        return self.net.InvRoIAlign(
+                            blobs_in, 
+                            blobs_out, 
+                            spatial_scale=cfg.MEM.SCALE)
+
+    def ResizeMemoryAs(self, mem, blob, scale, layer):
+        blobs = [mem, blob]
+        blobs_in = [ c2_utils.UnscopeTopName(b._name) for b in blobs ]
+
+        dirname = osp.dirname(blobs_in[0])
+        basename = 'mem%d' % layer
+        output_name = dirname + '/' + basename 
+        blobs_out = [ output_name ]
+
+        return self.net.ResizeBilinearAs(
+                            blobs_in, 
+                            blobs_out, 
+                            spatial_scale=scale)
+
+    def ConcatAttention(self, attends_to_concat):
+        blobs_in = [ c2_utils.UnscopeTopName(b._name) for b in attends_to_concat ]
+
+        dirname = 'final/'
+        basename = osp.basename(blobs_in[0])
+        output_name = dirname + basename + '_concat'
+        blobs_out = [ output_name ]
+
+        return self.net.ConcatPlusAttention(blobs_in, 
+                                            blobs_out)
+
+    def AddSpatialSoftmax(self, attends):
+        blobs_in = [ c2_utils.UnscopeTopName(attends._name) ]
+
+        dirname = 'final/'
+        basename = osp.basename(blobs_in[0])
+        output_name = dirname + basename.replace('_concat', '_softmax')
+        blobs_out = [ output_name ]
+
+        return self.net.GroupSpatialSoftmax(
+                            blobs_in, 
+                            blobs_out, 
+                            num_classes=cfg.MEM.ITER+1)
+
+    def ReduceWithAttention(self, blobs, attend):
+        blobs_in = [ attend ]
+        blobs_in.extend(blobs)
+        blobs_in = [ c2_utils.UnscopeTopName(b._name) for b in blobs_in ]
+
+        dirname = 'final/'
+        basename = osp.basename(blobs_in[-1]).replace('_nb', '')
+        output_name = dirname + basename
+        blobs_out = [ output_name ]
+
+        return self.net.ReduceWithAttention(blobs_in, 
+                                            blobs_out, 
+                                            iter=cfg.MEM.ITER+1)
+
     def TrainableParams(self, gpu_id=-1):
         """Get the blob names for all trainable parameters, possibly filtered by
         GPU id.
