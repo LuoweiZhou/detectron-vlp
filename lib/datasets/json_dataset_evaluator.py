@@ -124,7 +124,7 @@ def _do_segmentation_eval(json_dataset, res_file, output_dir):
 
 
 def evaluate_boxes(
-    json_dataset, all_boxes, output_dir, use_salt=True, cleanup=False
+    json_dataset, all_boxes, output_dir, use_salt=True, cleanup=False, force=False
 ):
     res_file = os.path.join(
         output_dir, 'bbox_' + json_dataset.name + '_results'
@@ -134,7 +134,7 @@ def evaluate_boxes(
     res_file += '.json'
     _write_coco_bbox_results_file(json_dataset, all_boxes, res_file)
     # Only do evaluation on non-test sets (annotations are undisclosed on test)
-    if json_dataset.name.find('test') == -1:
+    if json_dataset.name.find('test') == -1 or force:
         coco_eval = _do_detection_eval(json_dataset, res_file, output_dir)
     else:
         coco_eval = None

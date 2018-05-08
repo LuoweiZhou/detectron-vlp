@@ -1,12 +1,9 @@
-# for times in 0.5 1 2; do
-#     for rng_seed in 3 227 1989; do
-#         # ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair vqa train_net --cfg configs/coco/rc_R-101-FPN_${times}x.yaml RNG_SEED $rng_seed
-#         ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair vqa train_net --cfg configs/ade/rc_R-50-FPN_${times}x.yaml RNG_SEED $rng_seed
-#         ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair vqa train_net --cfg configs/coco/rc_R-50-FPN_${times}x.yaml RNG_SEED $rng_seed
-#         # ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair vqa train_net --cfg configs/coco/rc_X-101-32x8d-FPN_${times}x.yaml RNG_SEED $rng_seed
-#         # ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair vqa train_net --cfg configs/coco/rc_X-101-64x4d-FPN_${times}x.yaml RNG_SEED $rng_seed
-#     done
-# done
+for times in 1; do
+    ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/ade/rc_R-101-FPN_${times}x.yaml
+    # ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/ade/rc_R-50-FPN_${times}x.yaml
+    ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/ade/rc_X-101-32x8d-FPN_${times}x.yaml
+    ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/ade/rc_X-101-64x4d-FPN_${times}x.yaml
+done
 
 # for rng_seed in 3 227 1989; do
 #     for attr in 0. 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.; do
@@ -19,11 +16,11 @@
 #     done
 # done
 
-for rng_seed in 3 227 1989; do
-    for times in 1 2; do
-        ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair vqa train_net --cfg configs/visual_genome/e2e_faster_rcnn_R-50-FPN_${times}x.yaml RNG_SEED $rng_seed
-        ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair vqa train_net --cfg configs/visual_genome/e2e_faster_rcnn_R-101-FPN_${times}x.yaml RNG_SEED $rng_seed
-        ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair vqa train_net --cfg configs/visual_genome/e2e_faster_rcnn_X-101-32x8d-FPN_${times}x.yaml RNG_SEED $rng_seed
-        ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair vqa train_net --cfg configs/visual_genome/e2e_faster_rcnn_X-101-64x4d-FPN_${times}x.yaml RNG_SEED $rng_seed
-    done
-done
+# for rng_seed in 3 227 1989; do
+#     for times in 1 2; do
+#         ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/ade/e2e_faster_rcnn_R-50-FPN_${times}x.yaml RNG_SEED $rng_seed
+#         ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/ade/e2e_faster_rcnn_R-101-FPN_${times}x.yaml RNG_SEED $rng_seed
+#         ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/ade/e2e_faster_rcnn_X-101-32x8d-FPN_${times}x.yaml RNG_SEED $rng_seed
+#         ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/ade/e2e_faster_rcnn_X-101-64x4d-FPN_${times}x.yaml RNG_SEED $rng_seed
+#     done
+# done

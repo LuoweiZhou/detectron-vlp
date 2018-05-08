@@ -132,6 +132,7 @@ def run_inference(
             atol=cfg.EXPECTED_RESULTS_ATOL,
             rtol=cfg.EXPECTED_RESULTS_RTOL
         )
+        output_dir = get_output_dir(training=False, weights=weights_file)
         task_evaluation.log_copy_paste_friendly_results(all_results, output_dir)
 
     return all_results

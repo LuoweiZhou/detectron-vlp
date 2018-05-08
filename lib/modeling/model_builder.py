@@ -306,6 +306,11 @@ def build_static_memory_model(model, add_conv_body_func,
         if model.train:
             head_loss_gradients['base'] = fast_rcnn_heads.add_fast_rcnn_losses_class_only(model)
 
+        image_blob_name = core.ScopedName('data')
+        rois_name = core.ScopedName('rois')
+        if 'gpu_0' in rois_name:
+            model.AddSummaryImageBoxes(image_blob_name, rois_name)
+
         blob_conv = [ model.StopGradient(bc, c2_utils.UnscopeName(bc._name + '_nb')) for bc in blob_conv ]
         cls_score = u'cls_score'
         cls_score_base = model.StopGradient(cls_score, cls_score + '_nb')
@@ -321,15 +326,16 @@ def build_static_memory_model(model, add_conv_body_func,
         cls_prob = cls_prob_base
         reuse = False
         for iter in range(1, cfg.MEM.ITER+1):
-            mem = memory_model.update(model, 
-                                    mem,
-                                    norm,
-                                    blob_conv,
-                                    dim_conv,
-                                    cls_score, 
-                                    cls_prob, 
-                                    iter, 
-                                    reuse=reuse)
+            mem = region_memory_model.update(model, 
+                                        mem,
+                                        norm,
+                                        blob_conv,
+                                        dim_conv,
+                                        spatial_scale_conv,
+                                        cls_score, 
+                                        cls_prob, 
+                                        iter, 
+                                        reuse=reuse)
             # for testing, return cls_prob
             cls_score, cls_prob, cls_attend = region_memory_model.prediction(model,
                                                                             mem,
@@ -345,6 +351,9 @@ def build_static_memory_model(model, add_conv_body_func,
                                                                                 cls_score, 
                                                                                 cfg.MEM.WEIGHT)
 
+            cls_score = model.StopGradient(cls_score, c2_utils.UnscopeName(cls_score._name + '_nb'))
+            cls_prob = model.StopGradient(cls_prob, c2_utils.UnscopeName(cls_prob._name + '_nb'))
+
             cls_score_list.append(cls_score)
             cls_attend_list.append(cls_attend)
 
@@ -353,16 +362,17 @@ def build_static_memory_model(model, add_conv_body_func,
         cls_score_final = region_memory_model.combine(model, cls_score_list, cls_attend_list)
 
         if model.train:
-            head_loss_gradients['final'] = region_memory_model.add_loss(model, 
+            head_loss_gradients['final'], cls_prob_final = region_memory_model.add_loss(model, 
                                                                         cls_score_final, 
                                                                         cfg.MEM.WEIGHT_FINAL)
-            
+
             loss_gradients = {}
             for lg in head_loss_gradients.values():
                 if lg is not None:
                     loss_gradients.update(lg)
             return loss_gradients
         else:
+            cls_prob_final = region_memory_model.add_final_prob(model, cls_score_final)
             return None
 
     optim.build_data_parallel_model(model, _single_gpu_build_func)

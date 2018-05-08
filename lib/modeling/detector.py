@@ -22,6 +22,7 @@ from __future__ import unicode_literals
 
 import numpy as np
 import logging
+import os.path as osp
 
 from caffe2.python import cnn
 from caffe2.python import core
@@ -97,7 +98,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
             lvl = cfg.FPN.RPN_MAX_LEVEL - i
             scale = 1. / scale_inv
             assert str(lvl) in fb._name
-            blobs_in = ['mem_00/spatial', 'im_info', c2_utils.UnscopeTopName(fb._name)]
+            blobs_in = ['mem_00/spatial', 'im_info', c2_utils.UnscopeName(fb._name)]
             blobs_out = ['mem_00/values_%d' % lvl]
             mem = self.net.ResizeMemoryInit(blobs_in, blobs_out, spatial_scale=scale)
             mem_blobs.append(mem)
@@ -124,14 +125,14 @@ class DetectionModelHelper(cnn.CNNModelHelper):
 
     def DivConvNorm(self, mem, norm):
         blobs = [mem, norm]
-        blobs_in = [ c2_utils.UnscopeTopName(b._name) for b in blobs ]
+        blobs_in = [ c2_utils.UnscopeName(b._name) for b in blobs ]
         dirname = osp.dirname(blobs_in[0])
         blobs_out = [dirname + '/normalized_assemble']
         return self.net.DivConvNorm(blobs_in, blobs_out)
 
     def CropAndResize(self, rois, feats):
         blobs = [feats, rois]
-        blobs_in = [ c2_utils.UnscopeTopName(b._name) for b in blobs ]
+        blobs_in = [ c2_utils.UnscopeName(b._name) for b in blobs ]
 
         dirname = osp.dirname(blobs_in[1])
         basename = osp.basename(blobs_in[0])
@@ -146,7 +147,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
 
     def InvCropAndResize(self, rois, feats, rfeats):
         blobs = [feats, rois, rfeats]
-        blobs_in = [ c2_utils.UnscopeTopName(b._name) for b in blobs ]
+        blobs_in = [ c2_utils.UnscopeName(b._name) for b in blobs ]
 
         dirname = osp.dirname(blobs_in[1])
         basename = osp.basename(blobs_in[2])
@@ -160,7 +161,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
 
     def RoIAlign(self, rois, feats):
         blobs = [feats, rois]
-        blobs_in = [ c2_utils.UnscopeTopName(b._name) for b in blobs ]
+        blobs_in = [ c2_utils.UnscopeName(b._name) for b in blobs ]
 
         dirname = osp.dirname(blobs_in[1])
         basename = osp.basename(blobs_in[0])
@@ -179,7 +180,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         for lvl in range(cfg.FPN.RPN_MIN_LEVEL, cfg.FPN.RPN_MAX_LEVEL+1):
             ind = lvl - cfg.FPN.RPN_MIN_LEVEL
             blobs = [feats_list[ind], rois_list[ind]]
-            blobs_in = [ c2_utils.UnscopeTopName(b._name) for b in blobs ]
+            blobs_in = [ c2_utils.UnscopeName(b._name) for b in blobs ]
             assert str(lvl) in blobs_in[0]
             assert str(lvl) in blobs_in[1]
             dirname = osp.dirname(blobs_in[1])
@@ -195,7 +196,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
                                             sampling_ratio=0))
 
         # combine features
-        crops = [ c2_utils.UnscopeTopName(b._name) for b in crops ]
+        crops = [ c2_utils.UnscopeName(b._name) for b in crops ]
         dirname = osp.commonprefix(crops)
         blobs_out = [dirname + 'crop', dirname + 'crop_split']
         crop = self.net.Concat(crops, blobs_out, axis=0)
@@ -204,7 +205,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
 
     def InvRoIAlign(self, rois, feats, rfeats):
         blobs = [feats, rois, rfeats]
-        blobs_in = [ c2_utils.UnscopeTopName(b._name) for b in blobs ]
+        blobs_in = [ c2_utils.UnscopeName(b._name) for b in blobs ]
 
         dirname = osp.dirname(blobs_in[1])
         basename = osp.basename(blobs_in[2])
@@ -218,7 +219,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
 
     def ResizeMemoryAs(self, mem, blob, scale, layer):
         blobs = [mem, blob]
-        blobs_in = [ c2_utils.UnscopeTopName(b._name) for b in blobs ]
+        blobs_in = [ c2_utils.UnscopeName(b._name) for b in blobs ]
 
         dirname = osp.dirname(blobs_in[0])
         basename = 'mem%d' % layer
@@ -231,7 +232,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
                             spatial_scale=scale)
 
     def ConcatAttention(self, attends_to_concat):
-        blobs_in = [ c2_utils.UnscopeTopName(b._name) for b in attends_to_concat ]
+        blobs_in = [ c2_utils.UnscopeName(b._name) for b in attends_to_concat ]
 
         dirname = 'final/'
         basename = osp.basename(blobs_in[0])
@@ -241,8 +242,19 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         return self.net.ConcatPlusAttention(blobs_in, 
                                             blobs_out)
 
+    def ConcatAttentionRegion(self, attends_to_concat):
+        blobs_in = [ c2_utils.UnscopeName(b._name) for b in attends_to_concat ]
+
+        dirname = 'final/'
+        basename = osp.basename(blobs_in[0])
+        output_name = dirname + basename + '_concat'
+        blobs_out = [ output_name ]
+
+        return self.net.ConcatPlusAttentionRegion(blobs_in, 
+                                                blobs_out)
+
     def AddSpatialSoftmax(self, attends):
-        blobs_in = [ c2_utils.UnscopeTopName(attends._name) ]
+        blobs_in = [ c2_utils.UnscopeName(attends._name) ]
 
         dirname = 'final/'
         basename = osp.basename(blobs_in[0])
@@ -257,7 +269,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
     def ReduceWithAttention(self, blobs, attend):
         blobs_in = [ attend ]
         blobs_in.extend(blobs)
-        blobs_in = [ c2_utils.UnscopeTopName(b._name) for b in blobs_in ]
+        blobs_in = [ c2_utils.UnscopeName(b._name) for b in blobs_in ]
 
         dirname = 'final/'
         basename = osp.basename(blobs_in[-1]).replace('_nb', '')
@@ -537,6 +549,34 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         return self.net.Conv(
             blobs_in, blob_out, kernel=kernel, order=self.order, **kwargs
         )
+
+    def FCShared(self,
+                blob_in,
+                blob_out,
+                dim_in,
+                dim_out,
+                weight=None,
+                bias=None,
+                **kwargs):
+        """Add conv op that shares weights and/or biases with another conv op.
+        """
+        use_bias = (False if ('no_bias' in kwargs and kwargs['no_bias']) else True)
+
+        if self.use_cudnn:
+            kwargs['engine'] = 'CUDNN'
+            kwargs['exhaustive_search'] = self.cudnn_exhaustive_search
+            if self.ws_nbytes_limit:
+                kwargs['ws_nbytes_limit'] = self.ws_nbytes_limit
+
+        if use_bias:
+            blobs_in = [blob_in, weight, bias]
+        else:
+            blobs_in = [blob_in, weight]
+
+        if 'no_bias' in kwargs:
+            del kwargs['no_bias']
+
+        return self.net.FC(blobs_in, blob_out, **kwargs)
 
     def BilinearInterpolation(
         self, blob_in, blob_out, dim_in, dim_out, up_scale

@@ -187,6 +187,11 @@ def evaluate_boxes(dataset, all_boxes, output_dir, use_matlab=False):
             dataset, all_boxes, output_dir, use_salt=not_comp, cleanup=not_comp
         )
         box_results = _coco_eval_to_box_results(coco_eval)
+    elif _use_json_dataset_evaluator_force(dataset):
+        coco_eval = json_dataset_evaluator.evaluate_boxes(
+            dataset, all_boxes, output_dir, use_salt=not_comp, cleanup=not_comp, force=True
+        )
+        box_results = _coco_eval_to_box_results(coco_eval)
     elif _use_cityscapes_evaluator(dataset):
         logger.warn('Cityscapes bbox evaluated using COCO metrics/conversions')
         coco_eval = json_dataset_evaluator.evaluate_boxes(
@@ -369,8 +374,10 @@ def check_expected_results(results, atol=0.005, rtol=0.1):
 
 def _use_json_dataset_evaluator(dataset):
     """Check if the dataset uses the general json dataset evaluator."""
-    return dataset.name.find('coco_') > -1 or dataset.name.startswith('visual_genome_') or dataset.name.startswith('ade_') or cfg.TEST.FORCE_JSON_DATASET_EVAL
+    return dataset.name.find('coco_') > -1 or cfg.TEST.FORCE_JSON_DATASET_EVAL
 
+def _use_json_dataset_evaluator_force(dataset):
+    return dataset.name.startswith('visual_genome_') or dataset.name.startswith('ade_') 
 
 def _use_cityscapes_evaluator(dataset):
     """Check if the dataset uses the Cityscapes dataset evaluator."""
