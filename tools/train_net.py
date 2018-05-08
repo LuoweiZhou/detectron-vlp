@@ -61,12 +61,6 @@ def parse_args():
         type=str
     )
     parser.add_argument(
-        '--multi-gpu-testing',
-        dest='multi_gpu_testing',
-        help='Use cfg.NUM_GPUS GPUs for inference',
-        default=True
-    )
-    parser.add_argument(
         '--skip-test',
         dest='skip_test',
         help='Do not test the final model',
@@ -118,10 +112,10 @@ def main():
     checkpoints = utils.train.train_model()
     # Test the trained model
     if not args.skip_test:
-        test_model(checkpoints['final'], args.multi_gpu_testing, args.opts)
+        test_model(checkpoints['final'], args.opts)
 
 
-def test_model(model_file, multi_gpu_testing, opts=None):
+def test_model(model_file, opts=None):
     """Test a model."""
     # Clear memory before inference
     workspace.ResetWorkspace()
@@ -130,8 +124,10 @@ def test_model(model_file, multi_gpu_testing, opts=None):
     else:
         from core.test_engine import run_inference
     # Run inference
-    if cfg.NUM_GPUS == 1:
+    if cfg.NUM_GPUS == 1 or len(cfg.TEST.DATASETS) > 1:
         multi_gpu_testing = False
+    else:
+        multi_gpu_testing = True
     run_inference(
         model_file, multi_gpu_testing=multi_gpu_testing,
         check_expected_results=True,

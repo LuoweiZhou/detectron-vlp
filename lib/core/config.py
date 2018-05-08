@@ -65,6 +65,93 @@ __C.CFG_FILE = b'default'
 
 __C.CFG_OPTS = b'default'
 
+# ---------------------------------------------------------------------------- #
+# Memory options
+# ---------------------------------------------------------------------------- #
+__C.MEM = AttrDict()
+
+# Number of memory iterations
+__C.MEM.ITER = 1
+
+# Height of the memory
+__C.MEM.INIT_H = 50
+# Width of the memory
+__C.MEM.INIT_W = 50
+# Scale of the memory
+__C.MEM.SCALE = 1 / 16.
+# reference layer
+__C.MEM.REFER = 'fpn_res4_5_sum'
+
+# Channel of the memory
+__C.MEM.C = 256
+
+# Basic stds in the memory
+__C.MEM.STD = 0.01
+# Base stds in the memory update function for input features
+__C.MEM.U_STD = 0.01
+# stds for attention
+__C.MEM.A_STD = 0.01
+
+# Feature to memory ratio
+__C.MEM.FM_R = 1.
+# Value to gate ratio
+__C.MEM.VG_R = 1.
+# FC to Pool ratio when combing the input
+__C.MEM.FP_R = 1.
+# learning rate ratio between memory and retinanet
+__C.MEM.MR_R = 1.
+# learning rate ratio between updating and prediction
+__C.MEM.UP_R = 1.
+
+# Kernel size for memory
+__C.MEM.CONV = 3
+
+# Canonical region size
+__C.MEM.CROP_SIZE = 7
+
+# Context aggregation
+__C.MEM.CT_L = 4
+__C.MEM.CT_CONV = 3
+
+# Input feature
+__C.MEM.IN = 'film'
+__C.MEM.IN_F = 'comb.one'
+__C.MEM.IN_R = 0.
+__C.MEM.IN_STD = 0.01
+__C.MEM.IN_L = 2
+__C.MEM.IN_CONV = 1
+
+# Memory final fc layer channels
+__C.MEM.FC_C = 4096
+__C.MEM.FC_L = 2
+
+# The weight for the memory based prediction
+__C.MEM.WEIGHT = 1.
+# Final supervision weight
+__C.MEM.WEIGHT_FINAL = 1.
+
+# Options for inference
+__C.MEM.NMS = 0.5
+# Detections per image
+__C.MEM.DPI = 100
+# Testing threshold
+__C.MEM.INFERENCE_TH = 0.
+# Testing top N
+__C.MEM.PRE_NMS_TOP_N = 1000
+
+# Detection mode
+__C.MEM.DET = 'cpu'
+# Activation mode for memory
+__C.MEM.ACT = 'relu'
+# Memory attention
+__C.MEM.ATTEND = 'min'
+# debug
+__C.MEM.BUG = 0
+# whether to back pro-propagate from memory to conv
+__C.MEM.TO_CONV = False
+# per class attention
+__C.MEM.PA = False
+
 # Random note: avoid using '.ON' as a config key since yaml converts it to True;
 # prefer 'ENABLED' instead
 

@@ -70,8 +70,8 @@ def add_fast_rcnn_outputs(model, blob_in, dim):
         bias_init=const_fill(0.0)
     )
 
-    if cfg.MODEL.ATTR:
-        in_dim = cfg.FAST_RCNN.MLP_HEAD_DIM
+    if cfg.MODEL.ATTR and model.train:
+        in_dim = dim
         if cfg.MODEL.CLS_EMBED:
             # first slice the fc7 feature
             model.net.SelectFG([blob_in, 'fg_idx'], 'fc7_fg')
@@ -157,7 +157,6 @@ def add_fast_rcnn_losses_class_only(model):
     )
     loss_gradients = blob_utils.get_loss_gradients(model, [loss_cls])
     model.AddLosses(['loss_cls'])
-
     model.Accuracy(['cls_prob', 'labels_int32'], 'accuracy_cls')
     model.AddMetrics('accuracy_cls')
     return loss_gradients

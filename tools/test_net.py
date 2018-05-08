@@ -33,7 +33,7 @@ import _init_paths
 from caffe2.python import workspace
 
 from core.config import assert_and_infer_cfg
-from core.config import cfg
+from core.config import cfg, get_output_dir
 from core.config import merge_cfg_from_file
 from core.config import merge_cfg_from_list
 import utils.c2
@@ -55,6 +55,12 @@ def parse_args():
         type=str
     )
     parser.add_argument(
+        '--multi-gpu-testing',
+        dest='multi_gpu_testing',
+        help='using cfg.NUM_GPUS for inference',
+        action='store_true'
+    )
+    parser.add_argument(
         '--weights',
         dest='weights',
         help='optional weights file',
@@ -70,12 +76,6 @@ def parse_args():
     )
     parser.add_argument(
         '--vis', dest='vis', help='visualize detections', action='store_true'
-    )
-    parser.add_argument(
-        '--multi-gpu-testing',
-        dest='multi_gpu_testing',
-        help='using cfg.NUM_GPUS for inference',
-        default=True
     )
     parser.add_argument(
         '--range',
@@ -114,8 +114,14 @@ if __name__ == '__main__':
         for opt in args.opts[1:]:
             cfg.CFG_OPTS += split + opt
             split = '#' if split == '_' else '_'
-    if not args.multi_gpu_testing:
+    if len(cfg.TEST.DATASETS) > 1:
         cfg.NUM_GPUS = 1
+        multi_gpu_testing = False
+    elif args.multi_gpu_testing:
+        multi_gpu_testing = True
+    else:
+        multi_gpu_testing = False
+
     assert_and_infer_cfg()
     logger.info('Testing with config:')
     logger.info(pprint.pformat(cfg))
@@ -123,7 +129,9 @@ if __name__ == '__main__':
     if args.weights is not None:
         weights = args.weights
     else:
-        weights = cfg.TEST.WEIGHTS
+        output_dir = get_output_dir(training=True)
+        weights = os.path.join(output_dir, 'model_final.pkl')
+        print('Weights file automatically set to be: %s' % weights)
 
     while not os.path.exists(weights) and args.wait:
         logger.info('Waiting for \'{}\' to exist...'.format(weights))
@@ -137,6 +145,6 @@ if __name__ == '__main__':
     run_inference(
         weights,
         ind_range=args.range,
-        multi_gpu_testing=args.multi_gpu_testing,
+        multi_gpu_testing=multi_gpu_testing,
         check_expected_results=True,
     )

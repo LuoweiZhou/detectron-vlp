@@ -144,8 +144,8 @@ def evaluate_scores(dataset, all_scores, output_dir):
     logger.info('Evaluating classifications')
     roidb = dataset.get_roidb(gt=True)
     all_scores = np.vstack(all_scores)
-    shapes = [aa.shape[0] for aa in all_scores]
     gt_classes = np.hstack([r['gt_classes'] for r in roidb])
+    assert gt_classes.shape[0] == all_scores.shape[0]
     scs, mcls_sc, mins_sc, valid = _rc_score(all_scores, gt_classes)
     acs, mcls_ac, mins_ac = _rc_accuracy(all_scores, gt_classes)
     aps, mcls_ap, mins_ap = _rc_average_precision(all_scores, gt_classes)
@@ -280,7 +280,7 @@ def log_box_proposal_results(results):
             logger.info('{}: {:.3f}'.format(k.ljust(pad), v))
 
 
-def log_copy_paste_friendly_results(results):
+def log_copy_paste_friendly_results(results, output_dir=None):
     """Log results in a format that makes it easy to copy-and-paste in a
     spreadsheet. Lines are prefixed with 'copypaste: ' to make grepping easy.
     """
@@ -292,6 +292,23 @@ def log_copy_paste_friendly_results(results):
             metric_vals = ['{:.4f}'.format(v) for v in metrics.values()]
             logger.info('copypaste: ' + ','.join(metric_names))
             logger.info('copypaste: ' + ','.join(metric_vals))
+
+    if output_dir:
+        result_file = os.path.join(output_dir, 'results.txt')
+        fid = open(result_file, 'w')
+        single_dataset = len(results.keys()) == 1
+        for dataset in results.keys():
+            if not single_dataset:
+                fid.write('Dataset: {}'.format(dataset))
+            single_metric = len(results[dataset].keys()) == 1
+            for task, metrics in results[dataset].items():
+                if not single_metric:
+                    fid.write('Task: {}'.format(task))
+                metric_names = metrics.keys()
+                metric_vals = ['{:.4f}'.format(v) for v in metrics.values()]
+                fid.write(','.join(metric_names) + '\n')
+                fid.write(','.join(metric_vals) + '\n')
+        fid.close()
 
 
 def check_expected_results(results, atol=0.005, rtol=0.1):
@@ -352,7 +369,7 @@ def check_expected_results(results, atol=0.005, rtol=0.1):
 
 def _use_json_dataset_evaluator(dataset):
     """Check if the dataset uses the general json dataset evaluator."""
-    return dataset.name.find('coco_') > -1 or cfg.TEST.FORCE_JSON_DATASET_EVAL
+    return dataset.name.find('coco_') > -1 or dataset.name.startswith('visual_genome_') or dataset.name.startswith('ade_') or cfg.TEST.FORCE_JSON_DATASET_EVAL
 
 
 def _use_cityscapes_evaluator(dataset):
@@ -391,12 +408,12 @@ def _rc_score_results(mcls_sc,
         'classification':
         OrderedDict(
             [
+                ('mcls_ap', mcls_ap * 100),
+                ('mcls_ac', mcls_ac * 100),
+                ('mins_ap', mins_ap * 100),
+                ('mins_ac', mins_ac * 100),
                 ('mcls_sc', mcls_sc),
-                ('mcls_ac', mcls_ac),
-                ('mcls_ap', mcls_ap),
                 ('mins_sc', mins_sc),
-                ('mins_ac', mins_ac),
-                ('mins_ap', mins_ap),
             ]
         )
     })

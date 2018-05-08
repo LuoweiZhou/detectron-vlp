@@ -1,17 +1,17 @@
 MODEL:
   TYPE: region_classification
   CONV_BODY: FPN.add_fpn_ResNet50_conv5_body
-  NUM_CLASSES: 1485
+  NUM_CLASSES: 81
   ATTR: False
   RC: True
 NUM_GPUS: 8
 SOLVER:
   WEIGHT_DECAY: 0.0001
   LR_POLICY: steps_with_decay
-  BASE_LR: 0.02
+  BASE_LR: 0.01
   GAMMA: 0.1
-  MAX_ITER: 90000
-  STEPS: [0, 60000, 80000]
+  MAX_ITER: 110000
+  STEPS: [0, 70000, 90000]
 FPN:
   FPN_ON: True
   MULTILEVEL_ROIS: True
@@ -23,17 +23,15 @@ FAST_RCNN:
   ROI_XFORM_SAMPLING_RATIO: 2
 TRAIN:
   WEIGHTS: https://s3-us-west-2.amazonaws.com/detectron/ImageNetPretrained/MSRA/R-50.pkl
-  DATASETS: ('ade_train_5',)
+  DATASETS: ('coco_2014_train', 'coco_2014_valminusminival')
   SCALES: (800,)
   MAX_SIZE: 1333
   BATCH_SIZE_PER_IM: 512
   RPN_PRE_NMS_TOP_N: 2000  # Per FPN level
 TEST:
-  DATASETS: ('ade_mtest_5',)
+  DATASETS: ('coco_2014_minival',)
   SCALE: 800
   MAX_SIZE: 1333
   NMS: 0.5
   RPN_PRE_NMS_TOP_N: 1000  # Per FPN level
   RPN_POST_NMS_TOP_N: 1000
-DATA_LOADER:
-  NUM_THREADS: 6

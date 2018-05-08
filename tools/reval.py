@@ -101,7 +101,7 @@ def do_reval(dataset_name, output_dir, args):
         output_dir,
         use_matlab=args.matlab_eval
     )
-    task_evaluation.log_copy_paste_friendly_results(results)
+    task_evaluation.log_copy_paste_friendly_results(results, output_dir)
 
 
 if __name__ == '__main__':

@@ -65,7 +65,7 @@ def process_in_parallel(
         start = subinds[i][0]
         end = subinds[i][-1] + 1
         subprocess_env['CUDA_VISIBLE_DEVICES'] = str(gpu_ind)
-        cmd = '{binary} --range {start} {end} --cfg {cfg_file} --weights {weights} --multi-gpu-testing False {opts}'
+        cmd = '{binary} --range {start} {end} --cfg {cfg_file} --weights {weights} {opts}'
         cmd = cmd.format(
             binary=shlex_quote(binary),
             start=int(start),

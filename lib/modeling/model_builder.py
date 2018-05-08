@@ -56,6 +56,8 @@ import modeling.rpn_heads as rpn_heads
 import roi_data.minibatch
 import utils.c2 as c2_utils
 
+import modeling.region_memory as region_memory_model
+
 logger = logging.getLogger(__name__)
 c2_utils.import_custom_ops()
 
@@ -102,6 +104,11 @@ def retinanet(model):
 def region_classification(model):
     # TODO(rbg): fold into build_generic_detection_model
     return build_generic_rc_model(model, get_func(cfg.MODEL.CONV_BODY),
+                                add_roi_box_head_func=get_func(cfg.FAST_RCNN.ROI_BOX_HEAD))
+
+def region_memory(model):
+    # TODO(rbg): fold into build_generic_detection_model
+    return build_static_memory_model(model, get_func(cfg.MODEL.CONV_BODY),
                                 add_roi_box_head_func=get_func(cfg.FAST_RCNN.ROI_BOX_HEAD))
 
 
@@ -264,6 +271,92 @@ def build_generic_rc_model(
         )
 
         if model.train:
+            loss_gradients = {}
+            for lg in head_loss_gradients.values():
+                if lg is not None:
+                    loss_gradients.update(lg)
+            return loss_gradients
+        else:
+            return None
+
+    optim.build_data_parallel_model(model, _single_gpu_build_func)
+    return model
+
+def build_static_memory_model(model, add_conv_body_func, 
+    add_roi_box_head_func, freeze_conv_body=False
+):
+    # TODO(rbg): fold this function into build_generic_detection_model
+    def _single_gpu_build_func(model):
+        """Builds the model on a single GPU. Can be called in a loop over GPUs
+        with name and device scoping to create a data parallel model."""
+        blob_conv, dim_conv, spatial_scale_conv = add_conv_body_func(model)
+
+        if not model.train:
+            model.conv_body_net = model.net.Clone('conv_body_net')
+
+        if cfg.FPN.FPN_ON:
+            # After adding the RPN head, restrict FPN blobs and scales to
+            # those used in the RoI heads
+            blob_conv, spatial_scale_conv = _narrow_to_fpn_roi_levels(blob_conv, spatial_scale_conv)
+
+        # break the fast rcnn head down
+        blob_frcn, dim_frcn = add_roi_box_head_func(model, blob_conv, dim_conv, spatial_scale_conv)
+        fast_rcnn_heads.add_fast_rcnn_outputs_class_only(model, blob_frcn, dim_frcn)
+        head_loss_gradients = {}
+        if model.train:
+            head_loss_gradients['base'] = fast_rcnn_heads.add_fast_rcnn_losses_class_only(model)
+
+        blob_conv = [ model.StopGradient(bc, c2_utils.UnscopeName(bc._name + '_nb')) for bc in blob_conv ]
+        cls_score = u'cls_score'
+        cls_score_base = model.StopGradient(cls_score, cls_score + '_nb')
+        cls_prob = u'cls_prob'
+        cls_prob_base = model.StopGradient(cls_prob, cls_prob + '_nb')
+
+        cls_score_list = [cls_score_base]
+        cls_attend_list = []
+
+        mem = region_memory_model.init(model)
+        norm = region_memory_model.init_normalizer(model)
+        cls_score = cls_score_base
+        cls_prob = cls_prob_base
+        reuse = False
+        for iter in range(1, cfg.MEM.ITER+1):
+            mem = memory_model.update(model, 
+                                    mem,
+                                    norm,
+                                    blob_conv,
+                                    dim_conv,
+                                    cls_score, 
+                                    cls_prob, 
+                                    iter, 
+                                    reuse=reuse)
+            # for testing, return cls_prob
+            cls_score, cls_prob, cls_attend = region_memory_model.prediction(model,
+                                                                            mem,
+                                                                            blob_conv,
+                                                                            spatial_scale_conv,
+                                                                            cls_score_base,
+                                                                            iter,
+                                                                            reuse=reuse)
+            # for training, it will get cls_prob when getting the loss
+            if model.train:
+                name = 'mem_%02d' % iter
+                head_loss_gradients[name], cls_prob = region_memory_model.add_loss(model, 
+                                                                                cls_score, 
+                                                                                cfg.MEM.WEIGHT)
+
+            cls_score_list.append(cls_score)
+            cls_attend_list.append(cls_attend)
+
+            reuse = True
+
+        cls_score_final = region_memory_model.combine(model, cls_score_list, cls_attend_list)
+
+        if model.train:
+            head_loss_gradients['final'] = region_memory_model.add_loss(model, 
+                                                                        cls_score_final, 
+                                                                        cfg.MEM.WEIGHT_FINAL)
+            
             loss_gradients = {}
             for lg in head_loss_gradients.values():
                 if lg is not None:

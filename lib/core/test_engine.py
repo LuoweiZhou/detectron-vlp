@@ -132,7 +132,7 @@ def run_inference(
             atol=cfg.EXPECTED_RESULTS_ATOL,
             rtol=cfg.EXPECTED_RESULTS_RTOL
         )
-        task_evaluation.log_copy_paste_friendly_results(all_results)
+        task_evaluation.log_copy_paste_friendly_results(all_results, output_dir)
 
     return all_results
 
