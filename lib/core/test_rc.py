@@ -54,11 +54,16 @@ def im_classify_bbox(model, im, box_proposals, timers=None):
     if cfg.FPN.FPN_ON and cfg.FPN.MULTILEVEL_ROIS:
         _add_multilevel_rois(inputs)
 
-    cls_prob = core.ScopedName('cls_prob')
     for k, v in inputs.items():
         workspace.FeedBlob(core.ScopedName(k), v)
 
     workspace.RunNet(model.net.Proto().name)
+    if cfg.MODEL.TYPE == 'region_classification':
+        cls_prob = core.ScopedName('cls_prob')
+    elif cfg.MODEL.TYPE == 'region_memory':
+        cls_prob = core.ScopedName('final/cls_prob')
+    else:
+        raise NotImplementedError
     cls_scores = workspace.FetchBlob(cls_prob)
 
     timers['im_detect_bbox'].toc()

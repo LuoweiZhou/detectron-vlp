@@ -29,7 +29,7 @@ def init_normalizer(model):
     return model.ResizeNormalizerInit()
 
 def add_loss(model, cls_score, loss_scale=1.0):
-    cls_score_name = c2_utils.UnscopeName(cls_score._name)
+    cls_score_name = c2_utils.UnscopeGPUName(cls_score._name)
     cls_prob_name = cls_score_name.replace('cls_score','cls_prob')
     loss_cls_name = cls_score_name.replace('cls_score','loss_cls')
     cls_prob, loss_cls = model.net.SoftmaxWithLoss(
@@ -38,43 +38,47 @@ def add_loss(model, cls_score, loss_scale=1.0):
         scale=model.GetLossScale() * loss_scale
     )
     loss_gradients = blob_utils.get_loss_gradients(model, [loss_cls])
-    model.AddLosses([loss_cls_name])
-    accuracy_cls_name = cls_score_name.replace('cls_score','accuracy_cls')
+    model.AddLosses([loss_cls])
+    accuracy_cls_name = cls_score_name.replace('cls_score', 'accuracy_cls')
     model.Accuracy([cls_prob_name, 'labels_int32'], accuracy_cls_name)
     model.AddMetrics(accuracy_cls_name)
+
     return loss_gradients, cls_prob
 
-def _mem_roi_align(model, mem):
+def _mem_roi_align(model, mem, name_scope):
+    mem_name = c2_utils.UnscopeGPUName(mem._name)
     mem_crop = model.RoIFeatureTransform(
-        c2_utils.UnscopeName(mem._name),
-        'mem_crop',
+        mem_name,
+        name_scope + '/mem_crop',
         blob_rois='rois',
         method=cfg.FAST_RCNN.ROI_XFORM_METHOD,
-        resolution=cfg.FAST_RCNN.ROI_XFORM_RESOLUTION,
+        resolution=cfg.MEM.CROP_SIZE,
         sampling_ratio=cfg.FAST_RCNN.ROI_XFORM_SAMPLING_RATIO,
         spatial_scale=cfg.MEM.SCALE
     )
     return mem_crop
 
 def _norm_roi_align(model, norm):
+    norm_name = c2_utils.UnscopeGPUName(norm._name)
     norm_crop = model.RoIFeatureTransform(
-        c2_utils.UnscopeName(norm._name),
+        norm_name,
         'norm_crop',
         blob_rois='rois',
         method=cfg.FAST_RCNN.ROI_XFORM_METHOD,
-        resolution=cfg.FAST_RCNN.ROI_XFORM_RESOLUTION,
+        resolution=cfg.MEM.CROP_SIZE,
         sampling_ratio=cfg.FAST_RCNN.ROI_XFORM_SAMPLING_RATIO,
         spatial_scale=cfg.MEM.SCALE
     )
     return norm_crop
 
-def _ctx_roi_align(model, ctx):
+def _ctx_roi_align(model, ctx, name_scope):
+    ctx_name = c2_utils.UnscopeGPUName(ctx._name)
     ctx_crop = model.RoIFeatureTransform(
-        c2_utils.UnscopeName(ctx._name),
-        'ctx_crop',
+        ctx_name,
+        name_scope + '/ctx_crop',
         blob_rois='rois',
         method=cfg.FAST_RCNN.ROI_XFORM_METHOD,
-        resolution=cfg.FAST_RCNN.ROI_XFORM_RESOLUTION,
+        resolution=cfg.MEM.CROP_SIZE,
         sampling_ratio=cfg.FAST_RCNN.ROI_XFORM_SAMPLING_RATIO,
         spatial_scale=cfg.MEM.SCALE
     )
@@ -86,18 +90,17 @@ def _roi_align(model, conv_feats, spatial_scales):
         'conv_crop',
         blob_rois='rois',
         method=cfg.FAST_RCNN.ROI_XFORM_METHOD,
-        resolution=cfg.FAST_RCNN.ROI_XFORM_RESOLUTION,
+        resolution=cfg.MEM.CROP_SIZE,
         sampling_ratio=cfg.FAST_RCNN.ROI_XFORM_SAMPLING_RATIO,
         spatial_scale=spatial_scales
     )
     return conv_crop
 
-def _affine(model, conv_feats, dim, spatial_scales, logits, name_scope, reuse):
-    conv_crop = _roi_align(model, conv_feats, spatial_scales)
+def _affine(model, conv_crop, dim, logits, name_scope, reuse):
     init_weight = ('GaussianFill', {'std': cfg.MEM.IN_STD})
     init_bias_scale = ('ConstantFill', {'value': cfg.MEM.IN_R})
     init_bias_offset = ('ConstantFill', {'value': 0.})
-    cls_pred_dim = (model.num_classes if cfg.RETINANET.SOFTMAX else (model.num_classes - 1))
+    cls_pred_dim = model.num_classes
 
     scaler_name = name_scope + '/affine/scaler'
     offset_name = name_scope + '/affine/offset'
@@ -136,11 +139,13 @@ def _affine(model, conv_feats, dim, spatial_scales, logits, name_scope, reuse):
 
     # then try to combine them together
     scaled_name = name_scope + '/affine/scaled'
-    blobs_in = [c2_utils.UnscopeName(conv_crop._name), scaler_name]
+    blobs_in = [c2_utils.UnscopeGPUName(conv_crop._name), scaler_name]
+
     blobs_out = [scaled_name]
     scaled = model.MulConvFC(blobs_in, blobs_out)
     result_name = name_scope + '/affine/result'
-    blobs_in = [c2_utils.UnscopeName(scaled._name), offset_name]
+    blobs_in = [c2_utils.UnscopeGPUName(scaled._name), offset_name]
+
     blobs_out = [result_name]
     result = model.SumConvFC(blobs_in, blobs_out)
     result = model.Relu(result, result)
@@ -154,15 +159,15 @@ def _affine(model, conv_feats, dim, spatial_scales, logits, name_scope, reuse):
 
     return result
 
-def _input_features(model, conv_feats, dim, spatial_scales, logits, name_scope, reuse):
+def _input_features(model, conv_crop, dim, logits, name_scope, reuse):
     if cfg.MEM.IN == 'film':
-        input_feat = _affine(model, conv_feats, dim, spatial_scales, logits, name_scope, reuse)
+        input_feat = _affine(model, conv_crop, dim, logits, name_scope, reuse)
     else:
         raise NotImplementedError
 
     return input_feat
 
-def _inplace_update(model, mem_crop, input_crop, name_scope, reuse):
+def _inplace_update(model, mem_crop, input_crop, dim, name_scope, reuse):
     input_init = ('GaussianFill', {'std': cfg.MEM.U_STD})
     mem_init = ('GaussianFill', {'std': cfg.MEM.U_STD * cfg.MEM.FM_R})
     input_gate_init = ('GaussianFill', {'std': cfg.MEM.U_STD / cfg.MEM.VG_R})
@@ -183,7 +188,7 @@ def _inplace_update(model, mem_crop, input_crop, name_scope, reuse):
     reset_name = name_scope + '/inplace/reset'
     update_name = name_scope + '/inplace/update'
 
-    mem_crop_name = c2_utils.UnscopeName(mem_crop._name)
+    mem_crop_name = c2_utils.UnscopeGPUName(mem_crop._name)
     mult_mem_name = name_scope + '/inplace/mult_mem'
     next_crop_raw_name = name_scope + '/next_crop_raw'
     next_crop_name = name_scope + '/next_crop'
@@ -191,7 +196,7 @@ def _inplace_update(model, mem_crop, input_crop, name_scope, reuse):
     if not reuse:
         p_input = model.Conv(input_crop,
                             p_input_name,
-                            cfg.MEM.C,
+                            dim,
                             cfg.MEM.C,
                             mconv,
                             stride=1,
@@ -200,7 +205,7 @@ def _inplace_update(model, mem_crop, input_crop, name_scope, reuse):
                             bias_init=bias_init)
         p_reset = model.Conv(input_crop,
                             p_reset_name,
-                            cfg.MEM.C,
+                            dim,
                             1,
                             mconv,
                             stride=1,
@@ -209,7 +214,7 @@ def _inplace_update(model, mem_crop, input_crop, name_scope, reuse):
                             bias_init=bias_init)
         p_update = model.Conv(input_crop,
                             p_update_name,
-                            cfg.MEM.C,
+                            dim,
                             1,
                             mconv,
                             stride=1,
@@ -262,7 +267,7 @@ def _inplace_update(model, mem_crop, input_crop, name_scope, reuse):
 
         p_input = model.ConvShared(input_crop,
                             p_input_name,
-                            cfg.MEM.C,
+                            dim,
                             cfg.MEM.C,
                             mconv,
                             stride=1,
@@ -271,7 +276,7 @@ def _inplace_update(model, mem_crop, input_crop, name_scope, reuse):
                             bias=p_input_bias_name)
         p_reset = model.ConvShared(input_crop,
                             p_reset_name,
-                            cfg.MEM.C,
+                            dim,
                             1,
                             mconv,
                             stride=1,
@@ -280,7 +285,7 @@ def _inplace_update(model, mem_crop, input_crop, name_scope, reuse):
                             bias=p_reset_bias_name)
         p_update = model.ConvShared(input_crop,
                             p_update_name,
-                            cfg.MEM.C,
+                            dim,
                             1,
                             mconv,
                             stride=1,
@@ -350,12 +355,10 @@ def _inplace_update(model, mem_crop, input_crop, name_scope, reuse):
 
     return next_crop
 
-def _assemble(model, mem, norm, next_crop):
+def _assemble(model, mem, norm_diff, next_crop):
     # assemble back, inverse roi operation
     rois = core.ScopedBlobReference('rois')
     mem_diff = model.InvRoIAlign(rois, mem, next_crop)
-    norm_crop = _norm_roi_align(model, norm)
-    norm_diff = model.InvRoIAlign(rois, norm, norm_crop)
     normalized_diff = model.DivConvNorm(mem_diff, norm_diff)
 
     if 'gpu_0' in mem_diff._name:
@@ -365,17 +368,17 @@ def _assemble(model, mem, norm, next_crop):
 
     return normalized_diff
 
-def update(model, mem, norm, conv_feats, dim, spatial_scales, cls_score, cls_prob, iter, reuse):
+def update(model, mem, norm_diff, conv_crop, dim, cls_score, cls_prob, iter, reuse):
     # make sure everything is feature, no back propagation
     assert cls_score._name.endswith('_nb')
-    assert cls_prob._name.endswith('_nb')
+    # assert cls_prob._name.endswith('_nb')
     name_scope = 'mem_%02d' % iter
     # do something with the scale
     # then, get the spatial features
-    mem_crop = _mem_roi_align(model, mem)
-    input_crop = _input_features(model, conv_feats, dim, spatial_scales, cls_score, name_scope, reuse)
-    next_crop = _inplace_update(model, mem_crop, input_crop, name_scope, reuse)
-    mem_diff = _assemble(model, mem, norm, next_crop)
+    mem_crop = _mem_roi_align(model, mem, name_scope)
+    input_crop = _input_features(model, conv_crop, dim, cls_score, name_scope, reuse)
+    next_crop = _inplace_update(model, mem_crop, input_crop, dim, name_scope, reuse)
+    mem_diff = _assemble(model, mem, norm_diff, next_crop)
     mem = model.net.Sum([mem_diff, mem], name_scope + '/values')
 
     return mem
@@ -423,7 +426,7 @@ def _add_roi_2mlp_head(model, mem_cls, cls_score_base, name_scope, reuse):
 
     hidden_dim = cfg.FAST_RCNN.MLP_HEAD_DIM
     roi_size = cfg.FAST_RCNN.ROI_XFORM_RESOLUTION
-    ctx_crop = _mem_roi_align(model, mem_cls)
+    ctx_crop = _ctx_roi_align(model, mem_cls, name_scope)
     if not reuse:
         model.FC(ctx_crop, name_scope + '/fc6', cfg.MEM.C * roi_size * roi_size, hidden_dim,
                 weight_init=init_weight,
@@ -454,6 +457,7 @@ def _add_roi_2mlp_head(model, mem_cls, cls_score_base, name_scope, reuse):
 def _add_outputs(model, blob_fc7, dim_fc7, name_scope, reuse):
     init_weight = ('GaussianFill', {'std': 0.01})
     init_bias = ('ConstantFill', {'value': 0.})
+    init_bias_attend = ('ConstantFill', {'value': cfg.MEM.AT_R})
 
     if not reuse:
         cls_score = model.FC(
@@ -489,7 +493,7 @@ def _add_outputs(model, blob_fc7, dim_fc7, name_scope, reuse):
                 dim_fc7,
                 1,
                 weight_init=init_weight,
-                bias_init=init_bias)
+                bias_init=init_bias_attend)
     else:
         cls_attend = model.FCShared(
                 blob_fc7,
@@ -531,15 +535,17 @@ def combine(model, cls_score_list, cls_attend_list):
     for cls_score in cls_score_list:
         assert cls_score._name.endswith('_nb')
 
-    import pdb
-    pdb.set_trace()
-
     if num_preds > 1:
         cls_attend_final = model.ConcatAttentionRegion(cls_attend_list)
     else:
         cls_attend_final = cls_attend_list[0]
 
-    cls_weight_final = model.Softmax(cls_attend_final, 'cls_weight_final', engine='CUDNN')
+    cls_weight_final = model.Softmax(cls_attend_final, 'final/cls_weight', engine='CUDNN')
     cls_score_final = model.ReduceWithAttentionRegion(cls_score_list, cls_weight_final)
 
-    return
+    return cls_score_final
+
+def add_final_prob(model, cls_preds_final):
+    cls_prob = model.Softmax('final/cls_score', 
+                            'final/cls_prob', 
+                            engine='CUDNN')

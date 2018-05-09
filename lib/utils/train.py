@@ -136,6 +136,10 @@ def create_model():
 
     logger.info('Building model: {}'.format(cfg.MODEL.TYPE))
     model = model_builder.create(cfg.MODEL.TYPE, train=True, writer=writer)
+    params = [blob._name for blob in model.TrainableParams(gpu_id=0)]
+    for param in params:
+        if 'res' not in param:
+            model.AddSummaryHistogram(param)
     if cfg.MEMONGER:
         optimize_memory(model)
     # Performs random weight initialization as defined by the model

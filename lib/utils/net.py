@@ -80,7 +80,7 @@ def initialize_gpu_from_weights_file(model, weights_file, gpu_id=0):
     # Initialize weights on GPU gpu_id only
     unscoped_param_names = OrderedDict()  # Print these out in model order
     for blob in model.params:
-        unscoped_param_names[c2_utils.UnscopeName(str(blob))] = True
+        unscoped_param_names[c2_utils.UnscopeGPUName(blob._name)] = True
     with c2_utils.NamedCudaScope(gpu_id):
         for unscoped_param_name in unscoped_param_names.keys():
             if (unscoped_param_name.find(']_') >= 0 and
@@ -153,22 +153,22 @@ def save_model_to_weights_file(weights_file, model):
     blobs = {}
     # Save all parameters
     for param in model.params:
-        scoped_name = str(param)
-        unscoped_name = c2_utils.UnscopeName(scoped_name)
+        scoped_name = param._name
+        unscoped_name = c2_utils.UnscopeGPUName(scoped_name)
         if unscoped_name not in blobs:
             logger.debug(' {:s} -> {:s}'.format(scoped_name, unscoped_name))
             blobs[unscoped_name] = workspace.FetchBlob(scoped_name)
     # Save momentum
     for param in model.TrainableParams():
-        scoped_name = str(param) + '_momentum'
-        unscoped_name = c2_utils.UnscopeName(scoped_name)
+        scoped_name = param._name + '_momentum'
+        unscoped_name = c2_utils.UnscopeGPUName(scoped_name)
         if unscoped_name not in blobs:
             logger.debug(' {:s} -> {:s}'.format(scoped_name, unscoped_name))
             blobs[unscoped_name] = workspace.FetchBlob(scoped_name)
     # Save preserved blobs
     for scoped_name in workspace.Blobs():
         if scoped_name.startswith('__preserve__/'):
-            unscoped_name = c2_utils.UnscopeName(scoped_name)
+            unscoped_name = c2_utils.UnscopeGPUName(scoped_name)
             if unscoped_name not in blobs:
                 logger.debug(
                     ' {:s} -> {:s} (preserved)'.format(
@@ -252,9 +252,9 @@ def print_net(model, namescope='gpu_0'):
                 if isinstance(input_blob, np.ndarray):
                     input_shape = input_blob.shape
                     logger.info('{:28s}: {:20s} => {:28s}: {:20s}{}'.format(
-                        c2_utils.UnscopeName(str(input_name[j])),
+                        c2_utils.UnscopeGPUName(str(input_name[j])),
                         '{}'.format(input_shape),
-                        c2_utils.UnscopeName(str(output_name)),
+                        c2_utils.UnscopeGPUName(str(output_name)),
                         '{}'.format(output_shape),
                         suffix))
                     if first_blob:

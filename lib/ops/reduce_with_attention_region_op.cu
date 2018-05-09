@@ -26,8 +26,7 @@ __global__ void ReduceWithAttentionRegionForward(const int nthreads,
                               const int A, const int X,
                               const int iter, T* top_data) {
   CUDA_1D_KERNEL_LOOP(index, nthreads) {
-    int idx = index;
-    idx /= X;
+    const int idx = index / X;
     const int a = idx % A;
     const int n = idx / A;
 
@@ -42,8 +41,7 @@ __global__ void ReduceWithAttentionRegionBackward(const int nthreads, const T* i
                             const int A, const int X,
                             const int iter, T* output_grad) {
   CUDA_1D_KERNEL_LOOP(index, nthreads) {
-    int idx = index;
-    idx /= X;
+    const int idx = index / X;
     const int a = idx % A;
     const int n = idx / A;
 

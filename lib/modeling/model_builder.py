@@ -311,11 +311,15 @@ def build_static_memory_model(model, add_conv_body_func,
         if 'gpu_0' in rois_name:
             model.AddSummaryImageBoxes(image_blob_name, rois_name)
 
-        blob_conv = [ model.StopGradient(bc, c2_utils.UnscopeName(bc._name + '_nb')) for bc in blob_conv ]
+        if cfg.FPN.FPN_ON:
+            blob_conv = [ model.StopGradient(bc, c2_utils.UnscopeGPUName(bc._name + '_nb')) for bc in blob_conv ]
+        else:
+            blob_conv = model.StopGradient(blob_conv, c2_utils.UnscopeGPUName(blob_conv._name + '_nb'))
         cls_score = u'cls_score'
         cls_score_base = model.StopGradient(cls_score, cls_score + '_nb')
         cls_prob = u'cls_prob'
-        cls_prob_base = model.StopGradient(cls_prob, cls_prob + '_nb')
+        cls_prob_base = core.ScopedBlobReference(cls_prob)
+        # cls_prob_base = model.StopGradient(cls_prob, cls_prob + '_nb')
 
         cls_score_list = [cls_score_base]
         cls_attend_list = []
@@ -325,13 +329,16 @@ def build_static_memory_model(model, add_conv_body_func,
         cls_score = cls_score_base
         cls_prob = cls_prob_base
         reuse = False
+        conv_crop = region_memory_model._roi_align(model, blob_conv, spatial_scale_conv)
+        conv_crop_nb = model.StopGradient(conv_crop, c2_utils.UnscopeGPUName(conv_crop._name + '_nb'))
+        norm_crop = region_memory_model._norm_roi_align(model, norm)
+        norm_diff = model.InvRoIAlign(core.ScopedBlobReference('rois'), norm, norm_crop)
         for iter in range(1, cfg.MEM.ITER+1):
             mem = region_memory_model.update(model, 
                                         mem,
-                                        norm,
-                                        blob_conv,
+                                        norm_diff,
+                                        conv_crop_nb,
                                         dim_conv,
-                                        spatial_scale_conv,
                                         cls_score, 
                                         cls_prob, 
                                         iter, 
@@ -351,8 +358,8 @@ def build_static_memory_model(model, add_conv_body_func,
                                                                                 cls_score, 
                                                                                 cfg.MEM.WEIGHT)
 
-            cls_score = model.StopGradient(cls_score, c2_utils.UnscopeName(cls_score._name + '_nb'))
-            cls_prob = model.StopGradient(cls_prob, c2_utils.UnscopeName(cls_prob._name + '_nb'))
+            cls_score = model.StopGradient(cls_score, c2_utils.UnscopeGPUName(cls_score._name + '_nb'))
+            # cls_prob = model.StopGradient(cls_prob, c2_utils.UnscopeGPUName(cls_prob._name + '_nb'))
 
             cls_score_list.append(cls_score)
             cls_attend_list.append(cls_attend)

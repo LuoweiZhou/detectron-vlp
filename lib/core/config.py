@@ -125,6 +125,11 @@ __C.MEM.IN_CONV = 1
 __C.MEM.FC_C = 4096
 __C.MEM.FC_L = 2
 
+# Memory attention
+__C.MEM.AT = 'min'
+# Attention initial value
+__C.MEM.AT_R = -2.
+
 # The weight for the memory based prediction
 __C.MEM.WEIGHT = 1.
 # Final supervision weight
@@ -139,18 +144,8 @@ __C.MEM.INFERENCE_TH = 0.
 # Testing top N
 __C.MEM.PRE_NMS_TOP_N = 1000
 
-# Detection mode
-__C.MEM.DET = 'cpu'
 # Activation mode for memory
 __C.MEM.ACT = 'relu'
-# Memory attention
-__C.MEM.ATTEND = 'min'
-# debug
-__C.MEM.BUG = 0
-# whether to back pro-propagate from memory to conv
-__C.MEM.TO_CONV = False
-# per class attention
-__C.MEM.PA = False
 
 # Random note: avoid using '.ON' as a config key since yaml converts it to True;
 # prefer 'ENABLED' instead

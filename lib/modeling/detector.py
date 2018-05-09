@@ -79,7 +79,6 @@ class DetectionModelHelper(cnn.CNNModelHelper):
             self.writer.append_image_boxes(im_name, box_name)
 
     def ResizeMemoryInit(self):
-
         blobs_in = ['mem_00/spatial', 'im_info', cfg.MEM.REFER]
         blobs_out = ['mem_00/values']
         mem_init = self.net.ResizeMemoryInit(blobs_in, blobs_out, 
@@ -98,7 +97,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
             lvl = cfg.FPN.RPN_MAX_LEVEL - i
             scale = 1. / scale_inv
             assert str(lvl) in fb._name
-            blobs_in = ['mem_00/spatial', 'im_info', c2_utils.UnscopeName(fb._name)]
+            blobs_in = ['mem_00/spatial', 'im_info', c2_utils.UnscopeGPUName(fb._name)]
             blobs_out = ['mem_00/values_%d' % lvl]
             mem = self.net.ResizeMemoryInit(blobs_in, blobs_out, spatial_scale=scale)
             mem_blobs.append(mem)
@@ -107,7 +106,6 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         return list(reversed(mem_blobs))
 
     def ResizeNormalizerInit(self):
-
         blobs_in = ['mem_00/spatial_normalizer', 'im_info', cfg.MEM.REFER]
         blobs_out = ['mem_00/normalizer']
         return self.net.ResizeMemoryInit(blobs_in, blobs_out, 
@@ -125,14 +123,14 @@ class DetectionModelHelper(cnn.CNNModelHelper):
 
     def DivConvNorm(self, mem, norm):
         blobs = [mem, norm]
-        blobs_in = [ c2_utils.UnscopeName(b._name) for b in blobs ]
+        blobs_in = [ c2_utils.UnscopeGPUName(b._name) for b in blobs ]
         dirname = osp.dirname(blobs_in[0])
         blobs_out = [dirname + '/normalized_assemble']
         return self.net.DivConvNorm(blobs_in, blobs_out)
 
     def CropAndResize(self, rois, feats):
         blobs = [feats, rois]
-        blobs_in = [ c2_utils.UnscopeName(b._name) for b in blobs ]
+        blobs_in = [ c2_utils.UnscopeGPUName(b._name) for b in blobs ]
 
         dirname = osp.dirname(blobs_in[1])
         basename = osp.basename(blobs_in[0])
@@ -147,10 +145,11 @@ class DetectionModelHelper(cnn.CNNModelHelper):
 
     def InvCropAndResize(self, rois, feats, rfeats):
         blobs = [feats, rois, rfeats]
-        blobs_in = [ c2_utils.UnscopeName(b._name) for b in blobs ]
+        blobs_in = [ c2_utils.UnscopeGPUName(b._name) for b in blobs ]
 
         dirname = osp.dirname(blobs_in[1])
         basename = osp.basename(blobs_in[2])
+
         output_name = dirname + '/' + basename + '_assemble'
         blobs_out = [ output_name ]
 
@@ -161,7 +160,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
 
     def RoIAlign(self, rois, feats):
         blobs = [feats, rois]
-        blobs_in = [ c2_utils.UnscopeName(b._name) for b in blobs ]
+        blobs_in = [ c2_utils.UnscopeGPUName(b._name) for b in blobs ]
 
         dirname = osp.dirname(blobs_in[1])
         basename = osp.basename(blobs_in[0])
@@ -180,7 +179,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         for lvl in range(cfg.FPN.RPN_MIN_LEVEL, cfg.FPN.RPN_MAX_LEVEL+1):
             ind = lvl - cfg.FPN.RPN_MIN_LEVEL
             blobs = [feats_list[ind], rois_list[ind]]
-            blobs_in = [ c2_utils.UnscopeName(b._name) for b in blobs ]
+            blobs_in = [ c2_utils.UnscopeGPUName(b._name) for b in blobs ]
             assert str(lvl) in blobs_in[0]
             assert str(lvl) in blobs_in[1]
             dirname = osp.dirname(blobs_in[1])
@@ -196,7 +195,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
                                             sampling_ratio=0))
 
         # combine features
-        crops = [ c2_utils.UnscopeName(b._name) for b in crops ]
+        crops = [ c2_utils.UnscopeGPUName(b._name) for b in crops ]
         dirname = osp.commonprefix(crops)
         blobs_out = [dirname + 'crop', dirname + 'crop_split']
         crop = self.net.Concat(crops, blobs_out, axis=0)
@@ -205,11 +204,9 @@ class DetectionModelHelper(cnn.CNNModelHelper):
 
     def InvRoIAlign(self, rois, feats, rfeats):
         blobs = [feats, rois, rfeats]
-        blobs_in = [ c2_utils.UnscopeName(b._name) for b in blobs ]
+        blobs_in = [ c2_utils.UnscopeGPUName(b._name) for b in blobs ]
 
-        dirname = osp.dirname(blobs_in[1])
-        basename = osp.basename(blobs_in[2])
-        output_name = dirname + '/' + basename + '_assemble'
+        output_name = blobs_in[2] + '_assemble'
         blobs_out = [ output_name ]
 
         return self.net.InvRoIAlign(
@@ -219,7 +216,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
 
     def ResizeMemoryAs(self, mem, blob, scale, layer):
         blobs = [mem, blob]
-        blobs_in = [ c2_utils.UnscopeName(b._name) for b in blobs ]
+        blobs_in = [ c2_utils.UnscopeGPUName(b._name) for b in blobs ]
 
         dirname = osp.dirname(blobs_in[0])
         basename = 'mem%d' % layer
@@ -232,7 +229,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
                             spatial_scale=scale)
 
     def ConcatAttention(self, attends_to_concat):
-        blobs_in = [ c2_utils.UnscopeName(b._name) for b in attends_to_concat ]
+        blobs_in = [ c2_utils.UnscopeGPUName(b._name) for b in attends_to_concat ]
 
         dirname = 'final/'
         basename = osp.basename(blobs_in[0])
@@ -243,7 +240,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
                                             blobs_out)
 
     def ConcatAttentionRegion(self, attends_to_concat):
-        blobs_in = [ c2_utils.UnscopeName(b._name) for b in attends_to_concat ]
+        blobs_in = [ c2_utils.UnscopeGPUName(b._name) for b in attends_to_concat ]
 
         dirname = 'final/'
         basename = osp.basename(blobs_in[0])
@@ -254,7 +251,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
                                                 blobs_out)
 
     def AddSpatialSoftmax(self, attends):
-        blobs_in = [ c2_utils.UnscopeName(attends._name) ]
+        blobs_in = [ c2_utils.UnscopeGPUName(attends._name) ]
 
         dirname = 'final/'
         basename = osp.basename(blobs_in[0])
@@ -269,7 +266,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
     def ReduceWithAttention(self, blobs, attend):
         blobs_in = [ attend ]
         blobs_in.extend(blobs)
-        blobs_in = [ c2_utils.UnscopeName(b._name) for b in blobs_in ]
+        blobs_in = [ c2_utils.UnscopeGPUName(b._name) for b in blobs_in ]
 
         dirname = 'final/'
         basename = osp.basename(blobs_in[-1]).replace('_nb', '')
@@ -279,6 +276,19 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         return self.net.ReduceWithAttention(blobs_in, 
                                             blobs_out, 
                                             iter=cfg.MEM.ITER+1)
+
+    def ReduceWithAttentionRegion(self, blobs, attend):
+        blobs_in = [ attend ]
+        blobs_in.extend(blobs)
+        blobs_in = [ c2_utils.UnscopeGPUName(b._name) for b in blobs_in ]
+
+        dirname = 'final/'
+        basename = osp.basename(blobs_in[-1]).replace('_nb', '')
+        output_name = dirname + basename
+        blobs_out = [ output_name ]
+
+        return self.net.ReduceWithAttentionRegion(blobs_in, blobs_out, 
+                                                 iter=cfg.MEM.ITER+1)
 
     def TrainableParams(self, gpu_id=-1):
         """Get the blob names for all trainable parameters, possibly filtered by
@@ -768,7 +778,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         if not isinstance(losses, list):
             losses = [losses]
         # Conversion to str allows losses to include BlobReferences
-        losses = [c2_utils.UnscopeName(str(l)) for l in losses]
+        losses = [c2_utils.UnscopeGPUName(str(l)) for l in losses]
         self.losses = list(set(self.losses + losses))
 
     def AddMetrics(self, metrics):

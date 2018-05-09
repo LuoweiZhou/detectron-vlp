@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_rc_blob_names(is_training=True):
-    blob_names = ['rois']
+    blob_names = ['im_info', 'rois']
     if is_training:
         # labels_int32 blob: R categorical labels in [0, ..., K] for K
         # foreground classes plus background
@@ -88,11 +88,15 @@ def _get_gt_rois(roidb, im_scale, batch_idx):
     sampled_rois = sampled_boxes * im_scale
     repeated_batch_idx = batch_idx * blob_utils.ones((sampled_rois.shape[0], 1))
     sampled_rois = np.hstack((repeated_batch_idx, sampled_rois))
+    im_height = np.round(roidb['height'] * im_scale)
+    im_width = np.round(roidb['width'] * im_scale)
+    im_info = np.array([[im_height, im_width, im_scale]], dtype=np.float32)
 
     # Base Fast R-CNN blobs
     blob_dict = dict(
         labels_int32=sampled_labels.astype(np.int32, copy=False),
-        rois=sampled_rois
+        rois=sampled_rois,
+        im_info=im_info
     )
 
     return blob_dict

@@ -100,6 +100,14 @@ def UnscopeName(possibly_scoped_name):
         possibly_scoped_name.rfind(scope._NAMESCOPE_SEPARATOR) + 1:]
 
 
+def UnscopeGPUName(possibly_scoped_name):
+    """Remove any name scoping from a (possibly) scoped name. For example,
+    convert the name 'gpu_0/foo' to 'foo'."""
+    assert isinstance(possibly_scoped_name, string_types)
+    return possibly_scoped_name[
+        possibly_scoped_name.find(scope._NAMESCOPE_SEPARATOR) + 1:]
+
+
 @contextlib.contextmanager
 def NamedCudaScope(gpu_id):
     """Creates a GPU name scope and CUDA device scope. This function is provided
