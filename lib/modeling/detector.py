@@ -78,6 +78,10 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         if self.writer:
             self.writer.append_image_boxes(im_name, box_name)
 
+    def AddSummaryMem(self, mem_name):
+        if self.writer:
+            self.writer.append_mem(mem_name)
+
     def ResizeMemoryInit(self):
         blobs_in = ['mem_00/spatial', 'im_info', cfg.MEM.REFER]
         blobs_out = ['mem_00/values']
@@ -249,6 +253,15 @@ class DetectionModelHelper(cnn.CNNModelHelper):
 
         return self.net.ConcatPlusAttentionRegion(blobs_in, 
                                                 blobs_out)
+
+    def ConcatAttentionRegionNormal(self, attends_to_concat):
+        blobs_in = [ c2_utils.UnscopeGPUName(b._name) for b in attends_to_concat ]
+        dirname = 'final/'
+        basename = osp.basename(blobs_in[0])
+
+        blobs_out = [dirname + basename + '_concat', dirname + basename + '_split']
+        results = self.net.Concat(blobs_in, blobs_out, axis=1)
+        return results[0]
 
     def AddSpatialSoftmax(self, attends):
         blobs_in = [ c2_utils.UnscopeGPUName(attends._name) ]
@@ -570,21 +583,13 @@ class DetectionModelHelper(cnn.CNNModelHelper):
                 **kwargs):
         """Add conv op that shares weights and/or biases with another conv op.
         """
-        use_bias = (False if ('no_bias' in kwargs and kwargs['no_bias']) else True)
-
         if self.use_cudnn:
             kwargs['engine'] = 'CUDNN'
             kwargs['exhaustive_search'] = self.cudnn_exhaustive_search
             if self.ws_nbytes_limit:
                 kwargs['ws_nbytes_limit'] = self.ws_nbytes_limit
 
-        if use_bias:
-            blobs_in = [blob_in, weight, bias]
-        else:
-            blobs_in = [blob_in, weight]
-
-        if 'no_bias' in kwargs:
-            del kwargs['no_bias']
+        blobs_in = [blob_in, weight, bias]
 
         return self.net.FC(blobs_in, blob_out, **kwargs)
 

@@ -16,8 +16,10 @@ import utils.c2 as c2_utils
 def init(model):
     mem = model.create_param(
             param_name='mem_00/spatial',
-            initializer=initializers.Initializer("GaussianFill", std=0.01),
+            initializer=initializers.Initializer("GaussianFill", std=cfg.MEM.STD),
             shape=[cfg.MEM.C, cfg.MEM.INIT_H, cfg.MEM.INIT_W])
+    # if 'gpu_0' in mem._name:
+    #         model.AddSummaryMem(mem._name)
     # X: do some resizing here given the input images
     return model.ResizeMemoryInit()
 
@@ -389,6 +391,11 @@ def _build_context_cls(model, mem, name_scope, reuse):
     cpad = (cconv - 1) // 2
     init_weight = ('XavierFill', {})
     init_bias = ('ConstantFill', {'value': 0.})
+    if cfg.MEM.AT_MIN:
+        # minimal design
+        min_iter = 1
+    else:
+        min_iter = 0
 
     bl_in = mem
     for nconv in range(1, num_layers+1):
@@ -405,7 +412,6 @@ def _build_context_cls(model, mem, name_scope, reuse):
                 weight_init=init_weight,
                 bias_init=init_bias)
         else:
-            # X: wow! now I know how the weight is shared!!!!! 
             bl_out = model.ConvShared(
                 bl_in,
                 name_scope + suffix,
@@ -414,50 +420,55 @@ def _build_context_cls(model, mem, name_scope, reuse):
                 cconv,
                 stride=1,
                 pad=cpad,
-                weight='mem_01/context/cls_n{}_w'.format(nconv),
-                bias='mem_01/context/cls_n{}_b'.format(nconv))
+                weight='mem_%02d/context/cls_n%d_w' % (min_iter, nconv),
+                bias='mem_%02d/context/cls_n%d_b' % (min_iter, nconv))
         bl_in = model.Relu(bl_out, bl_out)
 
     return bl_in
 
-def _add_roi_2mlp_head(model, mem_cls, cls_score_base, name_scope, reuse):
-    init_weight = ('GaussianFill', {'std': 0.01})
+def _add_roi_2mlp_head(model, mem_cls, name_scope, reuse):
+    init_weight = ('GaussianFill', {'std': cfg.MEM.STD})
     init_bias = ('ConstantFill', {'value': 0.})
-
-    hidden_dim = cfg.FAST_RCNN.MLP_HEAD_DIM
-    roi_size = cfg.FAST_RCNN.ROI_XFORM_RESOLUTION
-    ctx_crop = _ctx_roi_align(model, mem_cls, name_scope)
-    if not reuse:
-        model.FC(ctx_crop, name_scope + '/fc6', cfg.MEM.C * roi_size * roi_size, hidden_dim,
-                weight_init=init_weight,
-                bias_init=init_bias)
-        model.Relu(name_scope + '/fc6', name_scope + '/fc6')
-        model.FC(name_scope + '/fc6', name_scope + '/fc7', hidden_dim, hidden_dim,
-                weight_init=init_weight,
-                bias_init=init_bias)
-        model.Relu(name_scope + '/fc7', name_scope + '/fc7')
+    if cfg.MEM.AT_MIN:
+        # minimal design
+        min_iter = 1
     else:
-        model.FCShared(ctx_crop, 
-                name_scope + '/fc6', 
-                cfg.MEM.C * roi_size * roi_size, 
-                hidden_dim,
-                weight='mem_01/fc6_w',
-                bias='mem_01/fc6_b')
-        model.Relu(name_scope + '/fc6', name_scope + '/fc6')
-        model.FC(name_scope + '/fc6', 
-                name_scope + '/fc7', 
-                hidden_dim, 
-                hidden_dim,
-                weight='mem_01/fc7_w',
-                bias='mem_01/fc7_b')
-        model.Relu(name_scope + '/fc7', name_scope + '/fc7')
+        min_iter = 0
 
-    return name_scope + '/fc7', hidden_dim
+    roi_size = cfg.MEM.CROP_SIZE
+    ctx_crop = _ctx_roi_align(model, mem_cls, name_scope)
 
-def _add_outputs(model, blob_fc7, dim_fc7, name_scope, reuse):
-    init_weight = ('GaussianFill', {'std': 0.01})
+    bl_in = ctx_crop
+    dim_in = cfg.MEM.C * roi_size * roi_size
+    dim_out =  cfg.MEM.FC_C
+
+    for nf in range(cfg.MEM.FC_L):
+        suffix = '/fc{}'.format(nf+6)
+        if not reuse:
+            bl_out = model.FC(bl_in,
+                            name_scope + suffix,
+                            dim_in, dim_out,
+                            weight_init=init_weight,
+                            bias_init=init_bias)
+        else:
+            bl_out = model.FCShared(bl_in,
+                            name_scope + suffix,
+                            dim_in, dim_out,
+                            weight='mem_%02d/fc%d_w' % (min_iter, nf+6),
+                            bias='mem_%02d/fc%d_b' % (min_iter, nf+6))
+        bl_in = model.Relu(bl_out, bl_out)
+        dim_in = dim_out
+
+    return c2_utils.UnscopeGPUName(bl_in._name), dim_out
+
+def _add_outputs(model, blob_fc7, dim_fc7, cls_score_base, name_scope, reuse):
+    init_weight = ('GaussianFill', {'std': cfg.MEM.STD})
     init_bias = ('ConstantFill', {'value': 0.})
-    init_bias_attend = ('ConstantFill', {'value': cfg.MEM.AT_R})
+    if cfg.MEM.AT_MIN:
+        # minimal design
+        min_iter = 1
+    else:
+        min_iter = 0
 
     if not reuse:
         cls_score = model.FC(
@@ -473,26 +484,40 @@ def _add_outputs(model, blob_fc7, dim_fc7, name_scope, reuse):
                 name_scope + '/cls_score',
                 dim_fc7,
                 model.num_classes,
-                weight='mem_01/cls_score_w',
-                bias='mem_01/cls_score_b')
+                weight='mem_%02d/cls_score_w' % min_iter,
+                bias='mem_%02d/cls_score_b' % min_iter)
 
     if not model.train:  # == if test
         # Only add softmax when testing; during training the softmax is combined
         # with the label cross entropy loss for numerical stability
         cls_prob = model.Softmax(name_scope + '/cls_score', 
-                    name_scope + '/cls_prob', 
-                    engine='CUDNN')
+                                name_scope + '/cls_prob', 
+                                engine='CUDNN')
     else:
-        cls_prob = None
+        cls_prob = None 
+
+    return cls_score, cls_prob
+
+
+def _add_attends(model, blob_fc7, dim_fc7, name_scope, reuse):
+    init_weight_attend = ('GaussianFill', {'std': cfg.MEM.AT_STD})
+    if cfg.MEM.AT_MIN:
+        # minimal design
+        min_iter = 1
+        init_bias_attend = ('ConstantFill', {'value': cfg.MEM.AT_R})
+    else:
+        min_iter = 0
+        init_bias_attend = ('ConstantFill', {'value': 0.})
 
     # then add attention
+    # if cfg.MEM.AT_MIN:
     if not reuse:
         cls_attend = model.FC(
                 blob_fc7,
                 name_scope + '/cls_attend',
                 dim_fc7,
                 1,
-                weight_init=init_weight,
+                weight_init=init_weight_attend,
                 bias_init=init_bias_attend)
     else:
         cls_attend = model.FCShared(
@@ -500,43 +525,95 @@ def _add_outputs(model, blob_fc7, dim_fc7, name_scope, reuse):
                 name_scope + '/cls_attend',
                 dim_fc7,
                 1,
-                weight='mem_01/cls_attend_w',
-                bias='mem_01/cls_attend_b')    
+                weight='mem_%02d/cls_attend_w' % min_iter,
+                bias='mem_%02d/cls_attend_b' % min_iter)
+    # else:
+    #     if not reuse:
+    #         cls_attend = model.FC(
+    #                 blob_fc7,
+    #                 name_scope + '/cls_attend',
+    #                 dim_fc7,
+    #                 1,
+    #                 weight_init=init_weight_attend,
+    #                 no_bias=True)
+    #     else:
+    #         cls_attend = model.FCShared(
+    #                 blob_fc7,
+    #                 name_scope + '/cls_attend',
+    #                 dim_fc7,
+    #                 1,
+    #                 weight='mem_%02d/cls_attend_w' % min_iter,
+    #                 no_bias=True)
 
-    return cls_score, cls_prob, cls_attend
+    return cls_attend
 
 
-def _build_pred(model, mem_cls, cls_score_base, name_scope, reuse):
-    blob_fc7, dim_fc7 = _add_roi_2mlp_head(model, mem_cls, cls_score_base, name_scope, reuse)
-    cls_score, cls_prob, cls_attend = _add_outputs(model, blob_fc7, dim_fc7, name_scope, reuse)
-    return cls_score, cls_prob, cls_attend
-
-
-def prediction(model, mem, conv_feats, spatial_scales, cls_score_base, iter, reuse):
-    # implement the most basic version of prediction
-    name_scope = 'mem_%02d' % iter
+def init_attenton_prediction(model, mem):
+    name_scope = 'mem_00'
     # add context to the network
     if cfg.MEM.CT_L:
-        mem_cls = _build_context_cls(model, mem, name_scope, reuse)
+        mem_cls = _build_context_cls(model, mem, name_scope, False)
     else:
         mem_cls = mem
 
-    cls_score, cls_prob, cls_attend = _build_pred(model, 
-                                                    mem_cls, 
-                                                    cls_score_base,
-                                                    name_scope, 
-                                                    reuse)
+    blob_fc7, dim_fc7 = _add_roi_2mlp_head(model, mem_cls, name_scope, False)
+    cls_attend = _add_attends(model, blob_fc7, dim_fc7, name_scope, False)
+
+    return cls_attend
+
+def prediction(model, mem, cls_score_base, iter, reuse):
+    # implement the most basic version of prediction
+    name_scope = 'mem_%02d' % iter
+    # a hack to fix the reusing issue
+    if cfg.MEM.AT_MIN:
+        reuse_this = reuse
+        reuse_cls = reuse
+    elif iter == 1:
+        reuse_this = True
+        reuse_cls = False
+    else:
+        reuse_this = True
+        reuse_cls = True
+
+    # add context to the network
+    if cfg.MEM.CT_L:
+        mem_cls = _build_context_cls(model, mem, name_scope, reuse_this)
+    else:
+        mem_cls = mem
+
+    blob_fc7, dim_fc7 = _add_roi_2mlp_head(model, mem_cls, 
+                                            name_scope, 
+                                            reuse_this)
+
+    cls_score, cls_prob = _add_outputs(model, 
+                                        blob_fc7, 
+                                        dim_fc7, 
+                                        cls_score_base,
+                                        name_scope, 
+                                        reuse_cls)
+
+    cls_attend = _add_attends(model, 
+                            blob_fc7, 
+                            dim_fc7, 
+                            name_scope, 
+                            reuse_this)
 
     return cls_score, cls_prob, cls_attend
 
 def combine(model, cls_score_list, cls_attend_list):
     num_preds = len(cls_score_list)
-    assert len(cls_attend_list) == num_preds - 1
     for cls_score in cls_score_list:
         assert cls_score._name.endswith('_nb')
+    if cfg.MEM.AT_MIN:
+        assert len(cls_attend_list) == num_preds - 1
+    else:
+        assert len(cls_attend_list) == num_preds
 
     if num_preds > 1:
-        cls_attend_final = model.ConcatAttentionRegion(cls_attend_list)
+        if cfg.MEM.AT_MIN:
+            cls_attend_final = model.ConcatAttentionRegion(cls_attend_list)
+        else:
+            cls_attend_final = model.ConcatAttentionRegionNormal(cls_attend_list)
     else:
         cls_attend_final = cls_attend_list[0]
 

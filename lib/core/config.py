@@ -89,8 +89,6 @@ __C.MEM.C = 256
 __C.MEM.STD = 0.01
 # Base stds in the memory update function for input features
 __C.MEM.U_STD = 0.01
-# stds for attention
-__C.MEM.A_STD = 0.01
 
 # Feature to memory ratio
 __C.MEM.FM_R = 1.
@@ -98,10 +96,6 @@ __C.MEM.FM_R = 1.
 __C.MEM.VG_R = 1.
 # FC to Pool ratio when combing the input
 __C.MEM.FP_R = 1.
-# learning rate ratio between memory and retinanet
-__C.MEM.MR_R = 1.
-# learning rate ratio between updating and prediction
-__C.MEM.UP_R = 1.
 
 # Kernel size for memory
 __C.MEM.CONV = 3
@@ -125,17 +119,22 @@ __C.MEM.IN_CONV = 1
 __C.MEM.FC_C = 4096
 __C.MEM.FC_L = 2
 
-# Memory attention
-__C.MEM.AT = 'min'
+# Memory attention, minimal design
+__C.MEM.AT_MIN = True
 # Attention initial value
 __C.MEM.AT_R = -2.
+# stds for attention
+__C.MEM.AT_STD = 0.01
 
 # The weight for the memory based prediction
 __C.MEM.WEIGHT = 1.
 # Final supervision weight
 __C.MEM.WEIGHT_FINAL = 1.
 
-# Options for inference
+# Activation mode for memory
+__C.MEM.ACT = 'relu'
+
+# Detection related options
 __C.MEM.NMS = 0.5
 # Detections per image
 __C.MEM.DPI = 100
@@ -143,9 +142,6 @@ __C.MEM.DPI = 100
 __C.MEM.INFERENCE_TH = 0.
 # Testing top N
 __C.MEM.PRE_NMS_TOP_N = 1000
-
-# Activation mode for memory
-__C.MEM.ACT = 'relu'
 
 # Random note: avoid using '.ON' as a config key since yaml converts it to True;
 # prefer 'ENABLED' instead

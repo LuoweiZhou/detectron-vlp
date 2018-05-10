@@ -1,0 +1,35 @@
+MODEL:
+  TYPE: region_memory
+  CONV_BODY: ResNet.add_ResNet50_conv4_body
+  NUM_CLASSES: 1485
+  ATTR: False
+  RC: True
+NUM_GPUS: 8
+SOLVER:
+  WEIGHT_DECAY: 0.0001
+  LR_POLICY: steps_with_decay
+  BASE_LR: 0.02
+  GAMMA: 0.1
+  MAX_ITER: 30000
+  STEPS: [0, 20000, 25000]
+RPN:
+  SIZES: (32, 64, 128, 256, 512)
+FAST_RCNN:
+  ROI_BOX_HEAD: ResNet.add_ResNet_roi_conv5_head
+  ROI_XFORM_METHOD: RoIAlign
+TRAIN:
+  WEIGHTS: https://s3-us-west-2.amazonaws.com/detectron/ImageNetPretrained/MSRA/R-50.pkl
+  DATASETS: ('ade_train_5',)
+  SCALES: (800,)
+  MAX_SIZE: 1333
+  IMS_PER_BATCH: 2
+  BATCH_SIZE_PER_IM: 512
+TEST:
+  DATASETS: ('ade_mtest_5',)
+  SCALE: 800
+  MAX_SIZE: 1333
+  NMS: 0.5
+  RPN_PRE_NMS_TOP_N: 6000
+  RPN_POST_NMS_TOP_N: 1000
+MEM:
+  REFER: 'res4_5_sum'

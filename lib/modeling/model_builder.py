@@ -321,11 +321,18 @@ def build_static_memory_model(model, add_conv_body_func,
         cls_prob_base = core.ScopedBlobReference(cls_prob)
         # cls_prob_base = model.StopGradient(cls_prob, cls_prob + '_nb')
 
-        cls_score_list = [cls_score_base]
-        cls_attend_list = []
-
         mem = region_memory_model.init(model)
+        if 'gpu_0' in mem._name:
+            model.AddSummaryMem(mem._name)
+
+        cls_score_list = [cls_score_base]
         norm = region_memory_model.init_normalizer(model)
+
+        if cfg.MEM.AT_MIN:
+            cls_attend_list = []
+        else:
+            cls_attend_list = [region_memory_model.init_attenton_prediction(model, mem)]
+
         cls_score = cls_score_base
         cls_prob = cls_prob_base
         reuse = False
@@ -343,11 +350,13 @@ def build_static_memory_model(model, add_conv_body_func,
                                         cls_prob, 
                                         iter, 
                                         reuse=reuse)
+
+            if 'gpu_0' in mem._name:
+                model.AddSummaryMem(mem._name)
+
             # for testing, return cls_prob
             cls_score, cls_prob, cls_attend = region_memory_model.prediction(model,
                                                                             mem,
-                                                                            blob_conv,
-                                                                            spatial_scale_conv,
                                                                             cls_score_base,
                                                                             iter,
                                                                             reuse=reuse)
