@@ -322,11 +322,10 @@ def build_static_memory_model(model, add_conv_body_func,
         # cls_prob_base = model.StopGradient(cls_prob, cls_prob + '_nb')
 
         mem = region_memory_model.init(model)
-        if 'gpu_0' in mem._name:
-            model.AddSummaryMem(mem._name)
-
         cls_score_list = [cls_score_base]
         norm = region_memory_model.init_normalizer(model)
+        if 'gpu_0' in mem._name:
+            model.AddSummaryMem(mem._name)
 
         if cfg.MEM.AT_MIN:
             cls_attend_list = []
@@ -340,6 +339,8 @@ def build_static_memory_model(model, add_conv_body_func,
         conv_crop_nb = model.StopGradient(conv_crop, c2_utils.UnscopeGPUName(conv_crop._name + '_nb'))
         norm_crop = region_memory_model._norm_roi_align(model, norm)
         norm_diff = model.InvRoIAlign(core.ScopedBlobReference('rois'), norm, norm_crop)
+        if 'gpu_0' in norm_diff._name:
+            model.AddSummaryMem(norm_diff._name)
         for iter in range(1, cfg.MEM.ITER+1):
             mem = region_memory_model.update(model, 
                                         mem,

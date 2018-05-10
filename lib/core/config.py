@@ -109,11 +109,9 @@ __C.MEM.CT_CONV = 3
 
 # Input feature
 __C.MEM.IN = 'film'
-__C.MEM.IN_F = 'comb.one'
 __C.MEM.IN_R = 0.
 __C.MEM.IN_STD = 0.01
-__C.MEM.IN_L = 2
-__C.MEM.IN_CONV = 1
+__C.MEM.IN_ACT = 'none'
 
 # Memory final fc layer channels
 __C.MEM.FC_C = 4096
@@ -122,7 +120,7 @@ __C.MEM.FC_L = 2
 # Memory attention, minimal design
 __C.MEM.AT_MIN = True
 # Attention initial value
-__C.MEM.AT_R = -2.
+__C.MEM.AT_R = 0.
 # stds for attention
 __C.MEM.AT_STD = 0.01
 

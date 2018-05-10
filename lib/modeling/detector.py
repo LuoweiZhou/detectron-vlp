@@ -86,7 +86,8 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         blobs_in = ['mem_00/spatial', 'im_info', cfg.MEM.REFER]
         blobs_out = ['mem_00/values']
         mem_init = self.net.ResizeMemoryInit(blobs_in, blobs_out, 
-                                        spatial_scale=cfg.MEM.SCALE)
+                                        spatial_scale=cfg.MEM.SCALE,
+                                        e_value = 0.)
         if cfg.MEM.ACT == 'tanh':
             return self.Tanh(mem_init, mem_init)
         elif cfg.MEM.ACT == 'relu':

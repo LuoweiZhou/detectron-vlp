@@ -20,6 +20,8 @@ __global__ void DivConvNormForward(const int nthreads,
     // only do safe division
     if (divider > 0.) {
       output[index] = input1[index] / divider;
+    } else {
+      output[index] = 0.;
     }
   }
 }
@@ -35,6 +37,8 @@ __global__ void DivConvNormBackward(const int nthreads,
     // only deal with input 1
     if (divider > 0.) {
       output_grad1[index] = input_grad[index] / divider;
+    } else {
+      output_grad1[index] = 0.;
     }
   }
 }

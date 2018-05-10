@@ -18,9 +18,6 @@ def init(model):
             param_name='mem_00/spatial',
             initializer=initializers.Initializer("GaussianFill", std=cfg.MEM.STD),
             shape=[cfg.MEM.C, cfg.MEM.INIT_H, cfg.MEM.INIT_W])
-    # if 'gpu_0' in mem._name:
-    #         model.AddSummaryMem(mem._name)
-    # X: do some resizing here given the input images
     return model.ResizeMemoryInit()
 
 def init_normalizer(model):
@@ -139,6 +136,13 @@ def _affine(model, conv_crop, dim, logits, name_scope, reuse):
                           weight=offset_weight_name,
                           bias=offset_bias_name)
 
+    if cfg.MEM.IN_ACT == 'tanh':
+        scaler = model.Tanh(scaler, scaler)
+    elif cfg.MEM.IN_ACT == 'none':
+        pass
+    else:
+        raise NotImplementedError
+
     # then try to combine them together
     scaled_name = name_scope + '/affine/scaled'
     blobs_in = [c2_utils.UnscopeGPUName(conv_crop._name), scaler_name]
@@ -164,6 +168,9 @@ def _affine(model, conv_crop, dim, logits, name_scope, reuse):
 def _input_features(model, conv_crop, dim, logits, name_scope, reuse):
     if cfg.MEM.IN == 'film':
         input_feat = _affine(model, conv_crop, dim, logits, name_scope, reuse)
+    elif cfg.MEM.IN == 'mlp':
+        comb_feat = _bottomtop(model, dim, conv_crop, logits, name_scope, reuse)
+        input_feat = _input(model, comb_feat, name_scope, reuse)
     else:
         raise NotImplementedError
 
@@ -384,6 +391,107 @@ def update(model, mem, norm_diff, conv_crop, dim, cls_score, cls_prob, iter, reu
     mem = model.net.Sum([mem_diff, mem], name_scope + '/values')
 
     return mem
+
+def _bottomtop(model, dim, conv_crop, logits, name_scope, reuse):
+    init_conv = ('GaussianFill', {'std': cfg.MEM.STD})
+    init_fc = ('GaussianFill', {'std': cfg.MEM.STD * cfg.MEM.FP_R})
+    init_bias = ('ConstantFill', {'value': 0.})
+
+    conv_out_name = name_scope + '/input/01_conv_out'
+    fc_out_name = name_scope + '/input/01_fc_out'
+    in_conv = cfg.MEM.IN_CONV
+    in_pad = (in_conv - 1) // 2
+    if not reuse:
+        conv_out = model.Conv(conv_crop,
+                            conv_out_name,
+                            dim,
+                            cfg.MEM.C,
+                            in_conv,
+                            stride=1,
+                            pad=in_pad,
+                            weight_init=init_conv,
+                            bias_init=init_bias)
+
+        fc_out = model.FC(logits, 
+                          fc_out_name,
+                          model.num_classes - 1, 
+                          cfg.MEM.C,
+                          weight_init=init_fc,
+                          no_bias=True)
+    else:
+        conv_weight_name = 'mem_01/input/01_conv_out_w'
+        conv_bias_name = 'mem_01/input/01_conv_out_b'
+        conv_out = model.ConvShared(conv_crop,
+                            conv_out_name,
+                            dim,
+                            cfg.MEM.C,
+                            in_conv,
+                            stride=1,
+                            pad=in_pad,
+                            weight=conv_weight_name,
+                            bias=conv_bias_name)
+        
+        fc_weight_name = 'mem_01/input/01_fc_out_w'
+        fc_out = model.FCShared(logits, 
+                          fc_out_name,
+                          model.num_classes - 1, 
+                          cfg.MEM.C,
+                          weight=fc_weight_name,
+                          no_bias=True)
+
+    # then try to combine them together
+    sum_out_name = name_scope + '/input/01_out'
+    blobs_in = [conv_out_name, fc_out_name]
+    blobs_out = [sum_out_name]
+    sum_out = model.SumConvFC(blobs_in, blobs_out)
+    sum_out = model.Relu(sum_out, sum_out)
+
+    if 'gpu_0' in sum_out._name:
+        model.AddSummaryHistogram(conv_crop._name)
+        model.AddSummaryHistogram(logits._name)
+        model.AddSummaryHistogram(conv_out._name)
+        model.AddSummaryHistogram(fc_out._name)
+        model.AddSummaryHistogram(sum_out._name)
+
+    return sum_out
+
+def _input(model, comb_feat, name_scope, reuse):
+    num_layers = cfg.MEM.IN_L
+    in_conv = cfg.MEM.IN_CONV
+    in_pad = (in_conv - 1) // 2
+    init_weight = ('XavierFill', {})
+    init_bias = ('ConstantFill', {'value': 0.})
+    blob_in = comb_feat
+
+    for i in range(2, num_layers+1):
+        blob_out_name = name_scope + '/input/%02d' % i
+        if not reuse:
+            blob_out = model.Conv(blob_in,
+                                blob_out_name,
+                                cfg.MEM.C,
+                                cfg.MEM.C,
+                                in_conv,
+                                stride=1,
+                                pad=in_pad,
+                                weight_init=init_weight,
+                                bias_init=init_bias)
+        else:
+            conv_weight_name = 'mem_01/input/%02d_w' % i
+            conv_bias_name = 'mem_01/input/%02d_b' % i
+            blob_out = model.ConvShared(blob_in,
+                                    blob_out_name,
+                                    cfg.MEM.C,
+                                    cfg.MEM.C,
+                                    in_conv,
+                                    stride=1,
+                                    pad=in_pad,
+                                    weight=conv_weight_name,
+                                    bias=conv_bias_name)
+        blob_in = model.Relu(blob_out, blob_out)
+        if 'gpu_0' in blob_in._name:
+            model.AddSummaryHistogram(blob_in._name)
+
+    return blob_in
 
 def _build_context_cls(model, mem, name_scope, reuse):
     num_layers = cfg.MEM.CT_L

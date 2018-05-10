@@ -157,6 +157,8 @@ class RoIDataLoader(object):
             self._perm = np.random.permutation(np.arange(len(self._roidb)))
         self._perm = deque(self._perm)
         self._cur = 0
+        for i in range(10):
+            logger.info('DEQUE >> %d, %d' % (i, self._perm[i]))
 
     def _get_next_minibatch_inds(self):
         """Return the roidb indices for the next minibatch. Thread safe."""
