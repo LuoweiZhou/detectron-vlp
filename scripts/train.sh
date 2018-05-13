@@ -7,11 +7,24 @@
 # done
 
 # for data in ade coco; do
-#     # ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/${data}/rc_R-50-mem-FPN_1x.yaml MEM.AT_MIN False TRAIN.ASPECT_GROUPING False
+#     ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/${data}/rc_R-50-mem-FPN_1x.yaml MEM.AT_MIN False TRAIN.ASPECT_GROUPING False
 #     ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/${data}/rc_R-50-mem-C4_1x.yaml
 # done
 
-# ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/coco/rc_R-50-C4_1x.yaml FAST_RCNN.ROI_XFORM_SAMPLING_RATIO 0
+for fc_f in 2048 4096; do
+    for c in 256 512; do
+        for in_act in plain tanh; do
+            for pool in 7 14; do
+                for ct_l in 1 3 5; do
+                    ~/devfair/starter.sh 8 1 16 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/ade/rc_R-50-mem-C4_1x.yaml MEM.CT res MEM.CT_L $ct_l MEM.IN_ACT $in_act MEM.C $c MEM.FC_C $fc_f FAST_RCNN.ROI_XFORM_RESOLUTION $pool
+                    ~/devfair/starter.sh 8 1 16 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/ade/rc_R-50-mem-FPN_1x.yaml MEM.CT res MEM.CT_L $ct_l MEM.IN_ACT $in_act MEM.C $c MEM.FC_C $fc_f FAST_RCNN.ROI_XFORM_RESOLUTION $pool
+                    ~/devfair/starter.sh 8 1 16 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/coco/rc_R-50-mem-C4_1x.yaml MEM.CT res MEM.CT_L $ct_l MEM.IN_ACT $in_act MEM.C $c MEM.FC_C $fc_f FAST_RCNN.ROI_XFORM_RESOLUTION $pool
+                    ~/devfair/starter.sh 8 1 16 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/coco/rc_R-50-mem-FPN_1x.yaml MEM.CT res MEM.CT_L $ct_l MEM.IN_ACT $in_act MEM.C $c MEM.FC_C $fc_f FAST_RCNN.ROI_XFORM_RESOLUTION $pool
+                done
+            done
+        done
+    done
+done
 
 # for rng_seed in 3 227 1989; do
 #     for attr in 0. 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.; do
@@ -26,9 +39,9 @@
 
 # for rng_seed in 3 227 1989; do
 #     for times in 1 2; do
-#         ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/visual_genome/e2e_faster_rcnn_R-50-FPN_${times}x.yaml RNG_SEED $rng_seed FAST_RCNN.MLP_HEAD_DIM 2048
-#         ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/visual_genome/e2e_faster_rcnn_R-101-FPN_${times}x.yaml RNG_SEED $rng_seed FAST_RCNN.MLP_HEAD_DIM 2048
-#         ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/visual_genome/e2e_faster_rcnn_X-101-32x8d-FPN_${times}x.yaml RNG_SEED $rng_seed FAST_RCNN.MLP_HEAD_DIM 2048
-#         ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/visual_genome/e2e_faster_rcnn_X-101-64x4d-FPN_${times}x.yaml RNG_SEED $rng_seed FAST_RCNN.MLP_HEAD_DIM 2048
+#         ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/visual_genome/e2e_faster_rcnn_R-50-FPN_${times}x.yaml RNG_SEED $rng_seed FAST_RCNN.MLP_HEAD_DIM 2048 FPN.DIM 512
+#         ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/visual_genome/e2e_faster_rcnn_R-101-FPN_${times}x.yaml RNG_SEED $rng_seed FAST_RCNN.MLP_HEAD_DIM 2048 FPN.DIM 512
+#         ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/visual_genome/e2e_faster_rcnn_X-101-32x8d-FPN_${times}x.yaml RNG_SEED $rng_seed FAST_RCNN.MLP_HEAD_DIM 2048 FPN.DIM 512
+#         ~/devfair/starter.sh 8 1 72 priority,uninterrupted,learnfair,scavenge vqa train_net --cfg configs/visual_genome/e2e_faster_rcnn_X-101-64x4d-FPN_${times}x.yaml RNG_SEED $rng_seed FAST_RCNN.MLP_HEAD_DIM 2048 FPN.DIM 512
 #     done
 # done

@@ -184,6 +184,30 @@ def add_roi_2mlp_head(model, blob_in, dim_in, spatial_scale):
     model.Relu('fc7', 'fc7')
     return 'fc7', hidden_dim
 
+def add_roi_mlp_head(model, blob_in, dim_in, spatial_scale):
+    """Add a ReLU MLP with two hidden layers."""
+    hidden_dim = cfg.FAST_RCNN.MLP_HEAD_DIM
+    roi_size = cfg.FAST_RCNN.ROI_XFORM_RESOLUTION
+    roi_feat = model.RoIFeatureTransform(
+        blob_in,
+        'roi_feat',
+        blob_rois='rois',
+        method=cfg.FAST_RCNN.ROI_XFORM_METHOD,
+        resolution=roi_size,
+        sampling_ratio=cfg.FAST_RCNN.ROI_XFORM_SAMPLING_RATIO,
+        spatial_scale=spatial_scale
+    )
+    model.FC(roi_feat, 'fc6', dim_in * roi_size * roi_size, hidden_dim)
+    fc = model.Relu('fc6', 'fc6')
+
+    # add more layers:
+    for i in range(1, cfg.FAST_RCNN.NUM_LAYERS):
+        name = 'fc%d' % (i+6)
+        model.FC(fc, name, hidden_dim, hidden_dim)
+        fc = model.Relu(name, name)
+
+    return name, hidden_dim
+
 
 def add_roi_Xconv1fc_head(model, blob_in, dim_in, spatial_scale):
     """Add a X conv + 1fc head, as a reference if not using GroupNorm"""

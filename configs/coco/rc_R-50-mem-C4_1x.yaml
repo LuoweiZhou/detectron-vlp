@@ -10,7 +10,6 @@ SOLVER:
   LR_POLICY: steps_with_decay
   BASE_LR: 0.01
   GAMMA: 0.1
-  # 1x schedule (note TRAIN.IMS_PER_BATCH: 1)
   MAX_ITER: 90000
   STEPS: [0, 60000, 80000]
 RPN:

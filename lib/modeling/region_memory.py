@@ -399,22 +399,20 @@ def _bottomtop(model, dim, conv_crop, logits, name_scope, reuse):
 
     conv_out_name = name_scope + '/input/01_conv_out'
     fc_out_name = name_scope + '/input/01_fc_out'
-    in_conv = cfg.MEM.IN_CONV
-    in_pad = (in_conv - 1) // 2
     if not reuse:
         conv_out = model.Conv(conv_crop,
                             conv_out_name,
                             dim,
                             cfg.MEM.C,
-                            in_conv,
+                            1,
                             stride=1,
-                            pad=in_pad,
+                            pad=0,
                             weight_init=init_conv,
                             bias_init=init_bias)
 
         fc_out = model.FC(logits, 
                           fc_out_name,
-                          model.num_classes - 1, 
+                          model.num_classes, 
                           cfg.MEM.C,
                           weight_init=init_fc,
                           no_bias=True)
@@ -425,16 +423,16 @@ def _bottomtop(model, dim, conv_crop, logits, name_scope, reuse):
                             conv_out_name,
                             dim,
                             cfg.MEM.C,
-                            in_conv,
+                            1,
                             stride=1,
-                            pad=in_pad,
+                            pad=0,
                             weight=conv_weight_name,
                             bias=conv_bias_name)
         
         fc_weight_name = 'mem_01/input/01_fc_out_w'
         fc_out = model.FCShared(logits, 
                           fc_out_name,
-                          model.num_classes - 1, 
+                          model.num_classes, 
                           cfg.MEM.C,
                           weight=fc_weight_name,
                           no_bias=True)
@@ -531,6 +529,88 @@ def _build_context_cls(model, mem, name_scope, reuse):
                 weight='mem_%02d/context/cls_n%d_w' % (min_iter, nconv),
                 bias='mem_%02d/context/cls_n%d_b' % (min_iter, nconv))
         bl_in = model.Relu(bl_out, bl_out)
+
+    return bl_in
+
+def _build_context_res_cls(model, mem_cls, name_scope, reuse):
+    num_layers = cfg.MEM.CT_L
+    cconv = cfg.MEM.CT_CONV
+    cpad = (cconv - 1) // 2
+    init_weight = ('XavierFill', {})
+    init_bias = ('ConstantFill', {'value': 0.})
+    if cfg.MEM.AT_MIN:
+        # minimal design
+        min_iter = 1
+    else:
+        min_iter = 0
+
+    # first do a convolution
+    if not reuse:
+        bl_in = model.Conv(mem_cls,
+                            name_scope + '/context/cls_res_n1',
+                            cfg.MEM.C,
+                            cfg.MEM.C,
+                            cconv,
+                            stride=1,
+                            pad=cpad,
+                            weight_init=init_weight,
+                            bias_init=init_bias)
+    else:
+        bl_in = model.ConvShared(
+                mem_cls,
+                name_scope + '/context/cls_res_n1',
+                cfg.MEM.C,
+                cfg.MEM.C,
+                cconv,
+                stride=1,
+                pad=cpad,
+                weight='mem_%02d/context/cls_res_n1_w' % (min_iter),
+                bias='mem_%02d/context/cls_res_n1_b' % (min_iter))
+    # then have resnet connections
+    for nconv in range(2, num_layers+1, 2):
+        if not reuse:
+            bl_out1 = model.Relu(bl_in, name_scope + '/context/cls_res_n{}_relu'.format(nconv-1))
+            bl_out1 = model.Conv(bl_out1,
+                                name_scope + '/context/cls_res_n{}'.format(nconv),
+                                cfg.MEM.C,
+                                cfg.MEM.C,
+                                cconv,
+                                stride=1,
+                                pad=cpad,
+                                weight_init=init_weight,
+                                bias_init=init_bias)
+            bl_out2 = model.Relu(bl_out1, bl_out1)
+            bl_out2 = model.Conv(bl_out2,
+                                name_scope + '/context/cls_res_n{}'.format(nconv+1),
+                                cfg.MEM.C,
+                                cfg.MEM.C,
+                                cconv,
+                                stride=1,
+                                pad=cpad,
+                                weight_init=init_weight,
+                                bias_init=init_bias)
+        else:
+            bl_out1 = model.Relu(bl_in, name_scope + '/context/cls_res_n{}_relu'.format(nconv-1))
+            bl_out1 = model.ConvShared(bl_out1,
+                                name_scope + '/context/cls_res_n{}'.format(nconv),
+                                cfg.MEM.C,
+                                cfg.MEM.C,
+                                cconv,
+                                stride=1,
+                                pad=cpad,
+                                weight='mem_%02d/context/cls_res_n%d_w' % (min_iter, nconv),
+                                bias='mem_%02d/context/cls_res_n%d_b' % (min_iter, nconv))
+            bl_out2 = model.Relu(bl_out1, bl_out1)
+            bl_out2 = model.ConvShared(bl_out2,
+                                name_scope + '/context/cls_res_n{}'.format(nconv+1),
+                                cfg.MEM.C,
+                                cfg.MEM.C,
+                                cconv,
+                                stride=1,
+                                pad=cpad,
+                                weight='mem_%02d/context/cls_res_n%d_w' % (min_iter, nconv+1),
+                                bias='mem_%02d/context/cls_res_n%d_b' % (min_iter, nconv+1))
+        bl_in = model.net.Sum([bl_in, bl_out2], name_scope + '/context/cls_res_r{}'.format(nconv+1))
 
     return bl_in
 
@@ -685,7 +765,12 @@ def prediction(model, mem, cls_score_base, iter, reuse):
 
     # add context to the network
     if cfg.MEM.CT_L:
-        mem_cls = _build_context_cls(model, mem, name_scope, reuse_this)
+        if cfg.MEM.CT == 'plain':
+            mem_cls = _build_context_cls(model, mem, name_scope, reuse_this)
+        elif cfg.MEM.CT == 'res':
+            mem_cls = _build_context_res_cls(model, mem, name_scope, reuse_this)
+        else:
+            raise NotImplementedError
     else:
         mem_cls = mem
 

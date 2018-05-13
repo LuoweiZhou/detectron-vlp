@@ -138,7 +138,7 @@ def create_model():
     model = model_builder.create(cfg.MODEL.TYPE, train=True, writer=writer)
     params = [blob._name for blob in model.TrainableParams(gpu_id=0)]
     for param in params:
-        if 'res' not in param:
+        if 'mem' in param:
             model.AddSummaryHistogram(param)
     if cfg.MEMONGER:
         optimize_memory(model)

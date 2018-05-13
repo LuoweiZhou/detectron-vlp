@@ -83,7 +83,7 @@ __C.MEM.SCALE = 1 / 16.
 __C.MEM.REFER = 'fpn_res4_5_sum'
 
 # Channel of the memory
-__C.MEM.C = 256
+__C.MEM.C = 512
 
 # Basic stds in the memory
 __C.MEM.STD = 0.01
@@ -106,12 +106,16 @@ __C.MEM.CROP_SIZE = 7
 # Context aggregation
 __C.MEM.CT_L = 4
 __C.MEM.CT_CONV = 3
+__C.MEM.CT = 'plain'
 
 # Input feature
 __C.MEM.IN = 'film'
+__C.MEM.IN_F = 'prob.one'
 __C.MEM.IN_R = 0.
 __C.MEM.IN_STD = 0.01
 __C.MEM.IN_ACT = 'none'
+__C.MEM.IN_CONV = 3
+__C.MEM.IN_L = 2
 
 # Memory final fc layer channels
 __C.MEM.FC_C = 4096
@@ -739,6 +743,8 @@ __C.FAST_RCNN.ROI_XFORM_SAMPLING_RATIO = 0
 # Note: some models may have constraints on what they can use, e.g. they use
 # pretrained FC layers like in VGG16, and will ignore this option
 __C.FAST_RCNN.ROI_XFORM_RESOLUTION = 14
+
+__C.FAST_RCNN.NUM_LAYERS = 2
 
 
 # ---------------------------------------------------------------------------- #

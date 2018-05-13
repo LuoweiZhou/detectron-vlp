@@ -576,7 +576,7 @@ def add_training_inputs(model, roidb=None):
             model.net.DequeueBlobs(
                 model.roi_data_loader._blobs_queue_name, blob_names
             )
-            if gpu_id == 0:
+            if gpu_id == 0 and (cfg.MODEL.FASTER_RCNN or cfg.MODEL.RC):
                 image_blob_name = core.ScopedName('data')
                 rois_name = core.ScopedName('rois')
                 # model.AddSummaryImage(image_blob_name)
