@@ -1002,7 +1002,7 @@ __C.NUM_CPUS = 4
 
 # Use NCCL for all reduce, otherwise use muji
 # Warning: if set to True, you may experience deadlocks
-__C.USE_NCCL = False
+__C.USE_NCCL = True
 
 # The mapping from image coordinates to feature map coordinates might cause
 # some boxes that are distinct in image space to become identical in feature

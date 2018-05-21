@@ -75,6 +75,13 @@ def parse_args():
         type=bool
     )
     parser.add_argument(
+        '--num_gpus',
+        dest='num_gpus',
+        help='number of gpus',
+        default=1,
+        type=int
+    )
+    parser.add_argument(
         '--vis', dest='vis', help='visualize detections', action='store_true'
     )
     parser.add_argument(
@@ -118,8 +125,10 @@ if __name__ == '__main__':
         cfg.NUM_GPUS = 1
         multi_gpu_testing = False
     elif args.multi_gpu_testing:
+        cfg.NUM_GPUS = args.num_gpus
         multi_gpu_testing = True
     else:
+        cfg.NUM_GPUS = args.num_gpus
         multi_gpu_testing = False
 
     assert_and_infer_cfg()

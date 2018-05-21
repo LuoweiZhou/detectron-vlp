@@ -376,6 +376,9 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         )(blobs_in, blobs_out, name=name, spatial_scale=spatial_scale)
         return blobs_out
 
+    def GenerateProposalsCPP(self, blobs_in, blobs_out, anchors, spatial_scale):
+        raise NotImplementedError
+
     def GenerateProposalLabels(self, blobs_in):
         """Op for generating training labels for RPN proposals. This is used
         when training RPN jointly with Fast/Mask R-CNN (as in end-to-end

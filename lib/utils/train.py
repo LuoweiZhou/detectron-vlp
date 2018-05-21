@@ -105,15 +105,13 @@ def create_model():
     start_iter = 0
     checkpoints = {}
     output_dir = get_output_dir(training=True)
-    tb_dir = get_tb_dir(training=True)
-    writer = SummaryWriter(tb_dir, tag="detectron")
     weights_file = cfg.TRAIN.WEIGHTS
     if cfg.TRAIN.AUTO_RESUME:
         # Check for the final model (indicates training already finished)
         final_path = os.path.join(output_dir, 'model_final.pkl')
         if os.path.exists(final_path):
             logger.info('model_final.pkl exists; no need to train!')
-            return None, None, None, {'final': final_path}, output_dir, writer
+            return None, None, None, {'final': final_path}, output_dir, None
 
         # Find the most recent checkpoint (highest iteration number)
         files = os.listdir(output_dir)
@@ -134,6 +132,8 @@ def create_model():
                 format(weights_file, start_iter)
             )
 
+    tb_dir = get_tb_dir(training=True)
+    writer = SummaryWriter(tb_dir, tag="detectron")
     logger.info('Building model: {}'.format(cfg.MODEL.TYPE))
     model = model_builder.create(cfg.MODEL.TYPE, train=True, writer=writer)
     params = [blob._name for blob in model.TrainableParams(gpu_id=0)]
