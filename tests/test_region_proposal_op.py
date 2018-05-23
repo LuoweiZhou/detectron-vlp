@@ -114,10 +114,11 @@ class RegionProposalOpTest(unittest.TestCase):
         blobs_in = ['cls_prob', 'bbox_prob', 'anchor', 'im_info']
         values_in = [ cls_prob, bbox_prob, anchor, im_info ]
         blobs_out = [ 'rois', 'roi_probs' ]
-        args = {'pre_nms_topN': 100, 
-                'post_nms_topN' : 20, 
-                'nms_thresh' : cfg.TEST.RPN_NMS_THRESH,
-                'im': im, 'stride' : stride}
+        args = {'pre_top_n': 100, 
+                'post_top_n' : 20, 
+                'nms' : cfg.TEST.RPN_NMS_THRESH,
+                'im': im, 
+                'stride' : stride}
         return self._run_general_op_cpu(op_name, blobs_in, values_in, blobs_out, **args)
 
     def _run_cpu_testing(self, cls_probs, bbox_preds, anchors, im_info):
@@ -132,7 +133,6 @@ class RegionProposalOpTest(unittest.TestCase):
             stride *= 2
             rpn_rois.append(rpn_roi)
             rpn_roi_probs.append(rpn_roi_prob)
-
         rpn_rois = np.vstack(rpn_rois)
         rpn_roi_probs = np.vstack(rpn_roi_probs)
         rpn_rois = rpn_rois[:, 1:]
