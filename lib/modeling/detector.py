@@ -371,13 +371,68 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         """
         name = 'GenerateProposalsOp:' + ','.join([str(b) for b in blobs_in])
         # spatial_scale passed to the Python op is only used in convert_pkl_to_pb
+        # only deals with a single layer, which generates multiple proposals
         self.net.Python(
             GenerateProposalsOp(anchors, spatial_scale, self.train).forward
         )(blobs_in, blobs_out, name=name, spatial_scale=spatial_scale)
         return blobs_out
 
-    def GenerateProposalsCPP(self, blobs_in, blobs_out, anchors, spatial_scale):
-        raise NotImplementedError
+    def GenerateProposalsCPP(self, blobs_in, blobs_out, anchors, stride):
+        rpn_scope = 'detect/'
+        num_images = cfg.TRAIN.IMS_PER_BATCH if self.train else 1
+        # blobs_in:
+        # [BlobReference("gpu_0/rpn_cls_probs_fpn2"), BlobReference("gpu_0/rpn_bbox_pred_fpn2"), u'im_info']
+        cp = c2_utils.UnscopeGPUName(blobs_in[0]._name)
+        bp = c2_utils.UnscopeGPUName(blobs_in[1]._name)
+        ac = c2_utils.UnscopeGPUName(blobs_in[2]._name)
+        info = c2_utils.UnscopeGPUName(blobs_in[3]._name)
+        
+        self.net.CopyGPUToCPU(cp, cp + '_host')
+        self.net.CopyGPUToCPU(bp, bp + '_host')
+        self.net.CopyGPUToCPU(ac, ac + '_host')
+        self.net.CopyGPUToCPU(info, info + '_host')
+
+        if self.train:
+            pre_nms_topN = cfg.TRAIN.RPN_PRE_NMS_TOP_N
+            post_nms_topN = cfg.TRAIN.RPN_POST_NMS_TOP_N
+            nms_thresh = cfg.TRAIN.RPN_NMS_THRESH
+            num_images = cfg.TRAIN.IMS_PER_BATCH
+        else:
+            pre_nms_topN = cfg.TEST.RPN_PRE_NMS_TOP_N
+            post_nms_topN = cfg.TEST.RPN_POST_NMS_TOP_N
+            nms_thresh = cfg.TEST.RPN_NMS_THRESH
+            num_images = 1
+
+        rois = []
+        roi_probs = []
+        for im in range(num_images):
+            blobs_out_im = [rpn_scope + blobs_out[0] + '_%02d' % im,
+                            rpn_scope + blobs_out[1] + '_%02d' % im]
+            with c2_utils.CpuScope():
+                self.net.GenerateProposalsSingleImage([cp + '_host', bp + '_host', ac + '_host', info + '_host'], 
+                                                      [blob + '_host' for blob in blobs_out_im], 
+                                                      pre_top_n=pre_nms_topN,
+                                                      post_top_n=post_nms_topN,
+                                                      nms_thresh=nms_thresh,
+                                                      im=im,
+                                                      stride=stride)
+            rois.append(blobs_out_im[0] + '_host')
+            roi_probs.append(blobs_out_im[1] + '_host')
+
+        # then just combine all of them
+        rois_out = [rpn_scope + blobs_out[0] + '_host',
+                    rpn_scope + blobs_out[0] + '_split']
+        roi_probs_out = [rpn_scope + blobs_out[1] + '_host',
+                        rpn_scope + blobs_out[1] + '_split']
+        with c2_utils.CpuScope():
+            self.net.Concat(rois, rois_out, axis=0)
+            self.net.Concat(roi_probs, roi_probs_out, axis=0)
+
+        # copy it back
+        self.net.CopyCPUToGPU(rpn_scope + blobs_out[0] + '_host', blobs_out[0])
+        self.net.CopyCPUToGPU(rpn_scope + blobs_out[1] + '_host', blobs_out[1])
+
+        return blobs_out
 
     def GenerateProposalLabels(self, blobs_in):
         """Op for generating training labels for RPN proposals. This is used

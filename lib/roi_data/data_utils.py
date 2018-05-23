@@ -60,7 +60,9 @@ def get_field_of_anchors(
 
     # Anchors at a single feature cell
     cell_anchors = generate_anchors(
-        stride=stride, sizes=anchor_sizes, aspect_ratios=anchor_aspect_ratios
+        stride=stride, 
+        sizes=anchor_sizes, 
+        aspect_ratios=anchor_aspect_ratios
     )
     num_cell_anchors = cell_anchors.shape[0]
 
@@ -91,6 +93,7 @@ def get_field_of_anchors(
     field_of_anchors = field_of_anchors.reshape((K * A, 4))
     foa = FieldOfAnchors(
         field_of_anchors=field_of_anchors.astype(np.float32),
+        cell_anchors=cell_anchors,
         num_cell_anchors=num_cell_anchors,
         stride=stride,
         field_size=field_size,

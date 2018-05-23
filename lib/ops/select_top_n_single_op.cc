@@ -100,7 +100,7 @@ Get the top (potentially top_n) index for each of the feature maps.
         "index for the top_n values.")
     .Output(
         1,
-        "yi",
+        "yv",
         "value for the top_n values.");
 
 SHOULD_NOT_DO_GRADIENT(SelectTopNSingle);

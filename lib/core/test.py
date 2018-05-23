@@ -134,6 +134,7 @@ def im_detect_bbox(model, im, target_scale, target_max_size, boxes=None):
         im_scales (list): list of image scales used in the input blob (as
             returned by _get_blobs and for use with im_detect_mask, etc.)
     """
+
     inputs, im_scale = _get_blobs(im, boxes, target_scale, target_max_size)
 
     # When mapping from image ROIs to feature map ROIs, there's some aliasing

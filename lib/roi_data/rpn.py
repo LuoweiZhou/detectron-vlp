@@ -36,6 +36,10 @@ def get_rpn_blob_names(is_training=True):
     """Blob names used by RPN."""
     # im_info: (height, width, image scale)
     blob_names = ['im_info']
+    # also add the anchors
+    for lvl in range(cfg.FPN.RPN_MIN_LEVEL, cfg.FPN.RPN_MAX_LEVEL + 1):
+        blob_names.append('anchors_' + str(lvl))
+                    
     if is_training:
         # gt boxes: (batch_idx, x1, y1, x2, y2, cls)
         blob_names += ['roidb']
@@ -73,6 +77,9 @@ def add_rpn_blobs(blobs, im_scales, roidb):
             foa = data_utils.get_field_of_anchors(
                 field_stride, anchor_sizes, anchor_aspect_ratios
             )
+            import pdb
+            pdb.set_trace()
+            blobs['anchors_%d' % lvl] = foa.cell_anchors
             foas.append(foa)
         all_anchors = np.concatenate([f.field_of_anchors for f in foas])
     else:
