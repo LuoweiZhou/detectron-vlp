@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 # of aspect ratios
 FieldOfAnchors = namedtuple(
     'FieldOfAnchors', [
-        'field_of_anchors', 'num_cell_anchors', 'stride', 'field_size',
+        'field_of_anchors', 'cell_anchors', 'num_cell_anchors', 'stride', 'field_size',
         'octave', 'aspect'
     ]
 )
@@ -93,7 +93,7 @@ def get_field_of_anchors(
     field_of_anchors = field_of_anchors.reshape((K * A, 4))
     foa = FieldOfAnchors(
         field_of_anchors=field_of_anchors.astype(np.float32),
-        cell_anchors=cell_anchors,
+        cell_anchors=cell_anchors.astype(np.float32),
         num_cell_anchors=num_cell_anchors,
         stride=stride,
         field_size=field_size,

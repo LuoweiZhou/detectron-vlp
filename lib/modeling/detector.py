@@ -369,6 +369,19 @@ class DetectionModelHelper(cnn.CNNModelHelper):
           - 'rpn_roi_probs': 1D tensor of objectness probability scores
             (extracted from rpn_cls_probs; see above).
         """
+        if self.train and cfg.TRAIN.CPP_RPN:
+            stride = int(1. / spatial_scale)
+            if cfg.FPN.FPN_ON and cfg.FPN.MULTILEVEL_RPN:
+                lvl = int(blobs_in[0]._name[-1])
+                anchors = 'anchors_%d' % lvl
+                return self.GenerateProposalsCpp(blobs_in, blobs_out, anchors, stride)
+            else:
+                anchors = 'anchors'
+                return self.GenerateProposalsCpp(blobs_in, blobs_out, anchors, stride)
+        else:
+            return self.GenerateProposalsPython(blobs_in, blobs_out, anchors, spatial_scale)
+
+    def GenerateProposalsPython(self, blobs_in, blobs_out, anchors, spatial_scale):
         name = 'GenerateProposalsOp:' + ','.join([str(b) for b in blobs_in])
         # spatial_scale passed to the Python op is only used in convert_pkl_to_pb
         # only deals with a single layer, which generates multiple proposals
@@ -377,19 +390,18 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         )(blobs_in, blobs_out, name=name, spatial_scale=spatial_scale)
         return blobs_out
 
-    def GenerateProposalsCPP(self, blobs_in, blobs_out, anchors, stride):
+    def GenerateProposalsCpp(self, blobs_in, blobs_out, anchors, stride):
         rpn_scope = 'detect/'
         num_images = cfg.TRAIN.IMS_PER_BATCH if self.train else 1
         # blobs_in:
         # [BlobReference("gpu_0/rpn_cls_probs_fpn2"), BlobReference("gpu_0/rpn_bbox_pred_fpn2"), u'im_info']
         cp = c2_utils.UnscopeGPUName(blobs_in[0]._name)
         bp = c2_utils.UnscopeGPUName(blobs_in[1]._name)
-        ac = c2_utils.UnscopeGPUName(blobs_in[2]._name)
-        info = c2_utils.UnscopeGPUName(blobs_in[3]._name)
+        info = blobs_in[2]
         
         self.net.CopyGPUToCPU(cp, cp + '_host')
-        self.net.CopyGPUToCPU(bp, bp + '_host')
-        self.net.CopyGPUToCPU(ac, ac + '_host')
+        self.net.CopyGPUToCPU(bp, bp + '_host') 
+        self.net.CopyGPUToCPU(anchors, anchors + '_host')
         self.net.CopyGPUToCPU(info, info + '_host')
 
         if self.train:
@@ -409,7 +421,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
             blobs_out_im = [rpn_scope + blobs_out[0] + '_%02d' % im,
                             rpn_scope + blobs_out[1] + '_%02d' % im]
             with c2_utils.CpuScope():
-                self.net.GenerateProposalsSingleImage([cp + '_host', bp + '_host', ac + '_host', info + '_host'], 
+                self.net.GenerateProposalsSingleImage([cp + '_host', bp + '_host', anchors + '_host', info + '_host'], 
                                                       [blob + '_host' for blob in blobs_out_im], 
                                                       pre_top_n=pre_nms_topN,
                                                       post_top_n=post_nms_topN,
@@ -428,7 +440,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
             self.net.Concat(rois, rois_out, axis=0)
             self.net.Concat(roi_probs, roi_probs_out, axis=0)
 
-        # copy it back
+        # copy it back, without the rpn scope
         self.net.CopyCPUToGPU(rpn_scope + blobs_out[0] + '_host', blobs_out[0])
         self.net.CopyCPUToGPU(rpn_scope + blobs_out[1] + '_host', blobs_out[1])
 
@@ -606,8 +618,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         kernel,
         weight=None,
         bias=None,
-        **kwargs
-    ):
+        **kwargs):
         """Add conv op that shares weights and/or biases with another conv op.
         """
         use_bias = (
@@ -704,8 +715,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         weight_init=None,
         bias_init=None,
         suffix='_bn',
-        inplace=False
-    ):
+        inplace=False):
         """ConvAffine adds a Conv op followed by a AffineChannel op (which
         replaces BN during fine tuning).
         """
@@ -735,8 +745,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         weight_init=None,
         bias_init=None,
         suffix='_gn',
-        no_conv_bias=1,
-    ):
+        no_conv_bias=1):
         """ConvGN adds a Conv op followed by a GroupNorm op,
         including learnable scale/bias (gamma/beta)
         """

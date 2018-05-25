@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class GenerateProposalLabelsOp(object):
-
+    
     def forward(self, inputs, outputs):
         """See modeling.detector.GenerateProposalLabels for inputs/outputs
         documentation.

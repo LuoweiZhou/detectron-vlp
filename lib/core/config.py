@@ -271,6 +271,9 @@ __C.TRAIN.FREEZE_CONV_BODY = False
 # output directory
 __C.TRAIN.AUTO_RESUME = True
 
+# Get the blobs from information
+__C.TRAIN.CPP_RPN = False
+
 
 # ---------------------------------------------------------------------------- #
 # Data loader options

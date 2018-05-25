@@ -37,8 +37,11 @@ def get_rpn_blob_names(is_training=True):
     # im_info: (height, width, image scale)
     blob_names = ['im_info']
     # also add the anchors
-    for lvl in range(cfg.FPN.RPN_MIN_LEVEL, cfg.FPN.RPN_MAX_LEVEL + 1):
-        blob_names.append('anchors_' + str(lvl))
+    if cfg.FPN.FPN_ON and cfg.FPN.MULTILEVEL_RPN:
+        for lvl in range(cfg.FPN.RPN_MIN_LEVEL, cfg.FPN.RPN_MAX_LEVEL + 1):
+            blob_names.append('anchors_' + str(lvl))
+    else:
+        blob_names.append('anchors')
                     
     if is_training:
         # gt boxes: (batch_idx, x1, y1, x2, y2, cls)
@@ -77,8 +80,6 @@ def add_rpn_blobs(blobs, im_scales, roidb):
             foa = data_utils.get_field_of_anchors(
                 field_stride, anchor_sizes, anchor_aspect_ratios
             )
-            import pdb
-            pdb.set_trace()
             blobs['anchors_%d' % lvl] = foa.cell_anchors
             foas.append(foa)
         all_anchors = np.concatenate([f.field_of_anchors for f in foas])
@@ -87,7 +88,9 @@ def add_rpn_blobs(blobs, im_scales, roidb):
             cfg.RPN.STRIDE, cfg.RPN.SIZES, cfg.RPN.ASPECT_RATIOS
         )
         all_anchors = foa.field_of_anchors
+        blobs['anchors'] = foa.cell_anchors
 
+    # this is to add some fpn targets
     for im_i, entry in enumerate(roidb):
         scale = im_scales[im_i]
         im_height = np.round(entry['height'] * scale)
@@ -98,10 +101,10 @@ def add_rpn_blobs(blobs, im_scales, roidb):
         gt_rois = entry['boxes'][gt_inds, :] * scale
         # TODO(rbg): gt_boxes is poorly named;
         # should be something like 'gt_rois_info'
-        gt_boxes = blob_utils.zeros((len(gt_inds), 6))
-        gt_boxes[:, 0] = im_i  # batch inds
-        gt_boxes[:, 1:5] = gt_rois
-        gt_boxes[:, 5] = entry['gt_classes'][gt_inds]
+        # gt_boxes = blob_utils.zeros((len(gt_inds), 6))
+        # gt_boxes[:, 0] = im_i  # batch inds
+        # gt_boxes[:, 1:5] = gt_rois
+        # gt_boxes[:, 5] = entry['gt_classes'][gt_inds]
         im_info = np.array([[im_height, im_width, scale]], dtype=np.float32)
         blobs['im_info'].append(im_info)
 
@@ -122,20 +125,27 @@ def add_rpn_blobs(blobs, im_scales, roidb):
             for k, v in rpn_blobs.items():
                 blobs[k].append(v)
 
-    for k, v in blobs.items():
-        if isinstance(v, list) and len(v) > 0:
-            blobs[k] = np.concatenate(v)
+    if cfg.TRAIN.CPP_RPN:
+        # maybe just get the ground truth related stuff
+        pass
+    else:
+        for k, v in blobs.items():
+            if isinstance(v, list) and len(v) > 0:
+                blobs[k] = np.concatenate(v)
 
-    valid_keys = [
-        'has_visible_keypoints', 'boxes', 'segms', 'seg_areas', 'gt_classes',
-        'gt_attributes', 'gt_overlaps', 'is_crowd', 'box_to_gt_ind_map', 'gt_keypoints'
-    ]
-    minimal_roidb = [{} for _ in range(len(roidb))]
-    for i, e in enumerate(roidb):
-        for k in valid_keys:
-            if k in e:
-                minimal_roidb[i][k] = e[k]
-    blobs['roidb'] = blob_utils.serialize(minimal_roidb)
+        valid_keys = [
+            'has_visible_keypoints', 'boxes', 'segms', 'seg_areas', 'gt_classes',
+            'gt_attributes', 'gt_overlaps', 'is_crowd', 'box_to_gt_ind_map', 'gt_keypoints'
+        ]
+
+        # keys to add: 
+
+        minimal_roidb = [{} for _ in range(len(roidb))]
+        for i, e in enumerate(roidb):
+            for k in valid_keys:
+                if k in e:
+                    minimal_roidb[i][k] = e[k]
+        blobs['roidb'] = blob_utils.serialize(minimal_roidb)
 
     # Always return valid=True, since RPN minibatches are valid by design
     return True
