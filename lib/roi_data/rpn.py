@@ -131,11 +131,11 @@ def add_rpn_blobs(blobs, im_scales, roidb):
 
     if cfg.TRAIN.CPP_RPN:
         for im_i, entry in enumerate(roidb):
-            # first with boxes
+            scale = im_scales[im_i]
             gt_inds = np.where((entry['gt_classes'] > 0) & (entry['is_crowd'] == 0))[0]
-            blobs['gt_boxes_%02d' % im_i] = entry['boxes'][gt_inds, :]
+            blobs['gt_boxes_%02d' % im_i] = entry['boxes'][gt_inds, :] * scale
             blobs['gt_classes_%02d' % im_i] = entry['gt_classes'][gt_inds]
-            blobs['box_to_gt_ind_map_%02d' % im_i] = entry['box_to_gt_ind_map'][gt_inds]
+            # blobs['box_to_gt_ind_map_%02d' % im_i] = entry['box_to_gt_ind_map'][gt_inds]
     else:
         valid_keys = [
             'has_visible_keypoints', 'boxes', 'segms', 'seg_areas', 'gt_classes',

@@ -467,13 +467,13 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         rpn_rois_list = [rpn_scope + 'rpn_rois_%02d' % im for im in range(num_images)]
         gt_boxes_list = ['gt_boxes_%02d' % im for im in range(num_images)]
         gt_classes_list = ['gt_classes_%02d' % im for im in range(num_images)]
-        box_to_gt_ind_map_list = ['box_to_gt_ind_map_%02d' % im for im in range(num_images)]
+        # box_to_gt_ind_map_list = ['box_to_gt_ind_map_%02d' % im for im in range(num_images)]
 
         # copy the ground truth annotations to cpu
         for im in range(num_images):
             self.net.CopyGPUToCPU(gt_boxes_list[im], gt_boxes_list[im] + '_host')
             self.net.CopyGPUToCPU(gt_classes_list[im], gt_classes_list[im] + '_host')
-            self.net.CopyGPUToCPU(box_to_gt_ind_map_list[im], box_to_gt_ind_map_list[im] + '_host')
+            # self.net.CopyGPUToCPU(box_to_gt_ind_map_list[im], box_to_gt_ind_map_list[im] + '_host')
 
         rois_list = ['rois_%02d' % im for im in range(num_images)]
         labels_list = ['labels_int32_%02d' % im for im in range(num_images)]
@@ -486,7 +486,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
                 self.net.GenerateProposalLabelsSingleImage([rpn_rois_list[im] + '_host', 
                                                             gt_boxes_list[im] + '_host', 
                                                             gt_classes_list[im] + '_host', 
-                                                            box_to_gt_ind_map_list[im] + '_host', 
+                                                            # box_to_gt_ind_map_list[im] + '_host', 
                                                             'im_info_host'], 
                                                           [rois_list[im] + '_host', 
                                                            labels_list[im] + '_host', 

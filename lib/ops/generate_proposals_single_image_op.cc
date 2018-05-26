@@ -51,7 +51,7 @@ int _build_heap(priority_queue<pair<float, int>, vector<pair<float, int>>, _comp
 
 template<>
 bool GenerateProposalsSingleImageOp<float, CPUContext>::RunOnDevice() {
-  const int num_inputs = InputSize();
+  // const int num_inputs = InputSize();
   auto& cls_probs = Input(0);
   auto& box_preds = Input(1);
   auto& anchors = Input(2);
