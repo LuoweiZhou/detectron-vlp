@@ -41,7 +41,10 @@ def add_generic_rpn_outputs(model, blob_in, dim_in, spatial_scale_in):
         if cfg.MODEL.FASTER_RCNN:
             # CollectAndDistributeFpnRpnProposals also labels proposals when in
             # training mode
-            model.CollectAndDistributeFpnRpnProposals()
+            if cfg.TRAIN.CPP_RPN:
+                model.CollectAndDistributeFpnRpnProposalsCpp()
+            else:
+                model.CollectAndDistributeFpnRpnProposals()
         if model.train:
             loss_gradients = FPN.add_fpn_rpn_losses(model)
     else:
@@ -112,11 +115,21 @@ def add_single_scale_rpn_outputs(model, blob_in, dim_in, spatial_scale):
             anchors=anchors,
             spatial_scale=spatial_scale
         )
+        # if cfg.TRAIN.CPP_RPN:
+        #     # should merge the rois for images
+        #     rois_out = ['rpn_rois', 'rpn_rois_split']
+        #     roi_probs_out = ['rpn_roi_probs', 'rpn_roi_probs_split']
+        #     self.net.Concat(rois, rois_out, axis=0)
+        #     self.net.Concat(roi_probs, roi_probs_out, axis=0)
 
     if cfg.MODEL.FASTER_RCNN:
         if model.train:
             # Add op that generates training labels for in-network RPN proposals
-            model.GenerateProposalLabels(['rpn_rois', 'roidb', 'im_info'])
+            if cfg.TRAIN.CPP_RPN:
+                # do all the processing there
+                model.GenerateProposalLabelsCpp()
+            else:
+                model.GenerateProposalLabels(['rpn_rois', 'roidb', 'im_info'])
         else:
             # Alias rois to rpn_rois for inference
             model.net.Alias('rpn_rois', 'rois')

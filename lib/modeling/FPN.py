@@ -28,6 +28,7 @@ from modeling.generate_anchors import generate_anchors
 from utils.c2 import const_fill
 from utils.c2 import gauss_fill
 from utils.net import get_group_gn
+from utils.c2 import UnscopeGPUName
 import modeling.ResNet as ResNet
 import utils.blob as blob_utils
 import utils.boxes as box_utils
@@ -430,12 +431,12 @@ def add_fpn_rpn_outputs(model, blobs_in, dim_in, spatial_scales):
                 rpn_cls_logits_fpn, 'rpn_cls_probs_fpn' + slvl
             )
             model.GenerateProposals(
-                [rpn_cls_probs_fpn, rpn_bbox_pred_fpn, 'im_info'],
+                [UnscopeGPUName(rpn_cls_probs_fpn._name), UnscopeGPUName(rpn_bbox_pred_fpn._name), 'im_info'],
                 ['rpn_rois_fpn' + slvl, 'rpn_roi_probs_fpn' + slvl],
                 anchors=lvl_anchors,
                 spatial_scale=sc
             )
-
+    # need to somehow merge it
 
 def add_fpn_rpn_losses(model):
     """Add RPN on FPN specific losses."""

@@ -125,20 +125,22 @@ def add_rpn_blobs(blobs, im_scales, roidb):
             for k, v in rpn_blobs.items():
                 blobs[k].append(v)
 
-    if cfg.TRAIN.CPP_RPN:
-        # maybe just get the ground truth related stuff
-        pass
-    else:
-        for k, v in blobs.items():
-            if isinstance(v, list) and len(v) > 0:
-                blobs[k] = np.concatenate(v)
+    for k, v in blobs.items():
+        if isinstance(v, list) and len(v) > 0:
+            blobs[k] = np.concatenate(v)
 
+    if cfg.TRAIN.CPP_RPN:
+        for im_i, entry in enumerate(roidb):
+            # first with boxes
+            gt_inds = np.where((entry['gt_classes'] > 0) & (entry['is_crowd'] == 0))[0]
+            blobs['gt_boxes_%02d' % im_i] = entry['boxes'][gt_inds, :]
+            blobs['gt_classes_%02d' % im_i] = entry['gt_classes'][gt_inds]
+            blobs['box_to_gt_ind_map_%02d' % im_i] = entry['box_to_gt_ind_map'][gt_inds]
+    else:
         valid_keys = [
             'has_visible_keypoints', 'boxes', 'segms', 'seg_areas', 'gt_classes',
             'gt_attributes', 'gt_overlaps', 'is_crowd', 'box_to_gt_ind_map', 'gt_keypoints'
         ]
-
-        # keys to add: 
 
         minimal_roidb = [{} for _ in range(len(roidb))]
         for i, e in enumerate(roidb):

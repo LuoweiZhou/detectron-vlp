@@ -35,11 +35,11 @@
 #     done
 # done
 
-# for rng_seed in 3 227 1989; do
-#     for times in 1 2; do
-#         ~/devfair/starter.sh 8 1 72 learnfair vqa train_net --cfg configs/visual_genome_trainval/e2e_faster_rcnn_R-50-FPN_${times}x.yaml RNG_SEED $rng_seed FAST_RCNN.MLP_HEAD_DIM 2048 FPN.DIM 512 MODEL.CLS_EMBED False
-#         ~/devfair/starter.sh 8 1 72 learnfair vqa train_net --cfg configs/visual_genome_trainval/e2e_faster_rcnn_R-101-FPN_${times}x.yaml RNG_SEED $rng_seed FAST_RCNN.MLP_HEAD_DIM 2048 FPN.DIM 512 MODEL.CLS_EMBED False
-#         ~/devfair/starter.sh 8 1 72 learnfair vqa train_net --cfg configs/visual_genome_trainval/e2e_faster_rcnn_X-101-32x8d-FPN_${times}x.yaml RNG_SEED $rng_seed FAST_RCNN.MLP_HEAD_DIM 2048 FPN.DIM 512 MODEL.CLS_EMBED False
-#         ~/devfair/starter.sh 8 1 72 learnfair vqa train_net --cfg configs/visual_genome_trainval/e2e_faster_rcnn_X-101-64x4d-FPN_${times}x.yaml RNG_SEED $rng_seed FAST_RCNN.MLP_HEAD_DIM 2048 FPN.DIM 512 MODEL.CLS_EMBED False
-#     done
-# done
+for rng_seed in 3 227 1989; do
+    for times in 1 2; do
+        ~/devfair/starter.sh 8 1 72 learnfair vqa train_net --cfg configs/visual_genome/e2e_faster_rcnn_R-50-FPN_${times}x.yaml RNG_SEED $rng_seed FAST_RCNN.MLP_HEAD_DIM 2048 
+        ~/devfair/starter.sh 8 1 72 learnfair vqa train_net --cfg configs/visual_genome/e2e_faster_rcnn_R-101-FPN_${times}x.yaml RNG_SEED $rng_seed FAST_RCNN.MLP_HEAD_DIM 2048 
+        ~/devfair/starter.sh 8 1 72 learnfair vqa train_net --cfg configs/visual_genome/e2e_faster_rcnn_X-101-32x8d-FPN_${times}x.yaml RNG_SEED $rng_seed FAST_RCNN.MLP_HEAD_DIM 2048 
+        ~/devfair/starter.sh 8 1 72 learnfair vqa train_net --cfg configs/visual_genome/e2e_faster_rcnn_X-101-64x4d-FPN_${times}x.yaml RNG_SEED $rng_seed FAST_RCNN.MLP_HEAD_DIM 2048 
+    done
+done

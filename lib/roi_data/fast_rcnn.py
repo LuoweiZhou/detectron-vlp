@@ -109,7 +109,7 @@ def get_fast_rcnn_blob_names(is_training=True):
                     blob_names += ['keypoint_rois_fpn' + str(lvl)]
                 blob_names += ['keypoint_rois_idx_restore_int32']
     return blob_names
-
+    
 
 def add_fast_rcnn_blobs(blobs, im_scales, roidb):
     """Add blobs needed for training Fast R-CNN style models."""
