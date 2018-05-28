@@ -493,12 +493,14 @@ class DetectionModelHelper(cnn.CNNModelHelper):
                                                            bbox_targets_list[im] + '_host', 
                                                            bbox_inside_weights_list[im] + '_host', 
                                                            bbox_outside_weights_list[im] + '_host'], 
+                                                          num_classes=self.num_classes,
                                                           rois_per_image=rois_per_image,
                                                           fg_rois_per_image=fg_rois_per_image,
                                                           fg_thresh=cfg.TRAIN.FG_THRESH,
                                                           bg_thresh_hi=cfg.TRAIN.BG_THRESH_HI,
                                                           bg_thresh_lo=cfg.TRAIN.BG_THRESH_LO,
-                                                          im=im)
+                                                          im=im,
+                                                          rng_seed=cfg.RNG_SEED)
                 self.net.CopyCPUToGPU(rois_list[im] + '_host', rois_list[im])
                 self.net.CopyCPUToGPU(labels_list[im] + '_host', labels_list[im])
                 self.net.CopyCPUToGPU(bbox_targets_list[im] + '_host', bbox_targets_list[im])
