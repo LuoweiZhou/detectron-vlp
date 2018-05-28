@@ -421,8 +421,8 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         rois = []
         roi_probs = []
         for im in range(num_images):
-            blobs_out_im = [rpn_scope + blobs_out[0] + '_%02d' % im,
-                            rpn_scope + blobs_out[1] + '_%02d' % im]
+            blobs_out_im = [rpn_scope + blobs_out[im*2],
+                            rpn_scope + blobs_out[im*2+1]]
             with c2_utils.CpuScope():
                 self.net.GenerateProposalsSingleImage([cp + '_host', bp + '_host', anchors + '_host', info + '_host'], 
                                                       [blob + '_host' for blob in blobs_out_im], 
@@ -463,17 +463,14 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         self.net.Concat(rpn_roi_probs, rpn_roi_probs_out, axis=0)
 
         # do the label calculation separately, then merge them
-        rpn_scope = 'rpn/'
-        rpn_rois_list = [rpn_scope + 'rpn_rois_%02d' % im for im in range(num_images)]
+        rpn_rois_list = ['rpn/rpn_rois_%02d' % im for im in range(num_images)]
         gt_boxes_list = ['gt_boxes_%02d' % im for im in range(num_images)]
         gt_classes_list = ['gt_classes_%02d' % im for im in range(num_images)]
-        # box_to_gt_ind_map_list = ['box_to_gt_ind_map_%02d' % im for im in range(num_images)]
 
         # copy the ground truth annotations to cpu
         for im in range(num_images):
             self.net.CopyGPUToCPU(gt_boxes_list[im], gt_boxes_list[im] + '_host')
             self.net.CopyGPUToCPU(gt_classes_list[im], gt_classes_list[im] + '_host')
-            # self.net.CopyGPUToCPU(box_to_gt_ind_map_list[im], box_to_gt_ind_map_list[im] + '_host')
 
         rois_list = ['rois_%02d' % im for im in range(num_images)]
         labels_list = ['labels_int32_%02d' % im for im in range(num_images)]
@@ -486,7 +483,6 @@ class DetectionModelHelper(cnn.CNNModelHelper):
                 self.net.GenerateProposalLabelsSingleImage([rpn_rois_list[im] + '_host', 
                                                             gt_boxes_list[im] + '_host', 
                                                             gt_classes_list[im] + '_host', 
-                                                            # box_to_gt_ind_map_list[im] + '_host', 
                                                             'im_info_host'], 
                                                           [rois_list[im] + '_host', 
                                                            labels_list[im] + '_host', 
