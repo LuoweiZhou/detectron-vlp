@@ -127,7 +127,7 @@ def add_single_scale_rpn_outputs(model, blob_in, dim_in, spatial_scale):
             # Add op that generates training labels for in-network RPN proposals
             if cfg.TRAIN.CPP_RPN:
                 # do all the processing there
-                model.GenerateProposalLabelsCpp()
+                model.GenerateProposalLabelsCppV2(use_gpu=False)
             else:
                 model.GenerateProposalLabels(['rpn_rois', 'roidb', 'im_info'])
         else:

@@ -1,5 +1,5 @@
-#ifndef GENERATE_PROPOSAL_LABELS_SINGLE_IMAGE_OP_H_
-#define GENERATE_PROPOSAL_LABELS_SINGLE_IMAGE_OP_H_
+#ifndef GENERATE_PROPOSAL_LABELS_ROIS_ONLY_OP_H_
+#define GENERATE_PROPOSAL_LABELS_ROIS_ONLY_OP_H_
 
 #include "caffe2/core/context.h"
 #include "caffe2/core/operator.h"
@@ -7,11 +7,10 @@
 namespace caffe2 {
 
 template <typename T, class Context>
-class GenerateProposalLabelsSingleImageOp final : public Operator<Context> {
+class GenerateProposalLabelsRoIsOnlyOp final : public Operator<Context> {
  public:
-  GenerateProposalLabelsSingleImageOp(const OperatorDef& def, Workspace* ws)
+  GenerateProposalLabelsRoIsOnlyOp(const OperatorDef& def, Workspace* ws)
       : Operator<Context>(def, ws),
-        num_classes_(OperatorBase::GetSingleArgument<int>("num_classes", 81)),
         rois_per_image_(OperatorBase::GetSingleArgument<int>("rois_per_image", 64)),
         fg_rois_per_image_(OperatorBase::GetSingleArgument<int>("fg_rois_per_image", 16)),
         fg_thresh_(OperatorBase::GetSingleArgument<float>("fg_thresh", 0.5)),
@@ -36,7 +35,6 @@ class GenerateProposalLabelsSingleImageOp final : public Operator<Context> {
   bool RunOnDevice() override;
 
  protected:
-  int num_classes_;
   int rois_per_image_;
   int fg_rois_per_image_;
   float fg_thresh_;
@@ -49,4 +47,4 @@ class GenerateProposalLabelsSingleImageOp final : public Operator<Context> {
 
 } // namespace caffe2
 
-#endif // GENERATE_PROPOSAL_LABELS_SINGLE_IMAGE_OP_H_
+#endif // GENERATE_PROPOSAL_LABELS_ROIS_ONLY_OP_H_
