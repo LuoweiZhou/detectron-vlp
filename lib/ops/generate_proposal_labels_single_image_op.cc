@@ -49,15 +49,15 @@ void _compute_targets(const float x1A, const float y1A, const float x2A, const f
   const float gt_ctr_x = x1B + 0.5 * gt_width;
   const float gt_ctr_y = y1B + 0.5 * gt_height;
 
-  const float wx = 10.;
-  const float wy = 10.;
-  const float ww = 5.;
-  const float wh = 5.;
+  // const float wx = 10.;
+  // const float wy = 10.;
+  // const float ww = 5.;
+  // const float wh = 5.;
 
-  const float target_dx = wx * (gt_ctr_x - ex_ctr_x) / ex_width;
-  const float target_dy = wy * (gt_ctr_y - ex_ctr_y) / ex_height;
-  const float target_dw = ww * log(gt_width / ex_width);
-  const float target_dh = wh * log(gt_height / ex_height);
+  const float target_dx = 10. * (gt_ctr_x - ex_ctr_x) / ex_width;
+  const float target_dy = 10. * (gt_ctr_y - ex_ctr_y) / ex_height;
+  const float target_dw = 5. * log(gt_width / ex_width);
+  const float target_dh = 5. * log(gt_height / ex_height);
 
   bbox_targets_pointer[offset] = target_dx;
   bbox_targets_pointer[offset+1] = target_dy;

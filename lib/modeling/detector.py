@@ -375,7 +375,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
             for im in range(cfg.TRAIN.IMS_PER_BATCH):
                 blobs_out_ims.extend([ b + '_%02d' % im for b in blobs_out ])
             if cfg.FPN.FPN_ON and cfg.FPN.MULTILEVEL_RPN:
-                lvl = int(blobs_in[0]._name[-1])
+                lvl = int(blobs_in[0][-1])
                 anchors = 'anchors_%d' % lvl
                 return self.GenerateProposalsCpp(blobs_in, blobs_out_ims, anchors, stride)
             else:
@@ -433,8 +433,8 @@ class DetectionModelHelper(cnn.CNNModelHelper):
             roi_probs.append(blobs_out_im[1] + '_host')
 
             # first is rois, then is roi_probs
-            self.net.CopyCPUToGPU(rpn_scope + blobs_out[0] + '_host', blobs_out[im*2])
-            self.net.CopyCPUToGPU(rpn_scope + blobs_out[1] + '_host', blobs_out[im*2+1])
+            # self.net.CopyCPUToGPU(rpn_scope + blobs_out[0] + '_host', blobs_out[im*2])
+            # self.net.CopyCPUToGPU(rpn_scope + blobs_out[1] + '_host', blobs_out[im*2+1])
 
         return blobs_out
 
@@ -444,12 +444,16 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         fg_rois_per_image = int(np.round(cfg.TRAIN.FG_FRACTION * rois_per_image))
 
         # do the concatenation, this is needed for getting the loss
-        rpn_rois_out = ['rpn_rois', 'rpn_rois_split']
-        rpn_rois = ['rpn_rois_%02d' % im for im in range(num_images)]
-        self.net.Concat(rpn_rois, rpn_rois_out, axis=0)
-        rpn_roi_probs_out = ['rpn_roi_probs', 'rpn_roi_probs_split']
-        rpn_roi_probs = ['rpn_roi_probs_%02d' % im for im in range(num_images)]
-        self.net.Concat(rpn_roi_probs, rpn_roi_probs_out, axis=0)
+        # rpn_rois_out = ['rpn_rois_host', 'rpn_rois_split_host']
+        # rpn_rois = ['rpn/rpn_rois_%02d_host' % im for im in range(num_images)]
+        # rpn_roi_probs_out = ['rpn_roi_probs_host', 'rpn_roi_probs_split_host']
+        # rpn_roi_probs = ['rpn/rpn_roi_probs_%02d_host' % im for im in range(num_images)]
+        # with c2_utils.CpuScope():
+        #     self.net.Concat(rpn_rois, rpn_rois_out, axis=0)
+        #     self.net.Concat(rpn_roi_probs, rpn_roi_probs_out, axis=0)
+        # # then copy it to gpu
+        # self.net.CopyCPUToGPU('rpn_rois_host', 'rpn_rois')
+        # self.net.CopyCPUToGPU('rpn_roi_probs_host', 'rpn_roi_probs')
 
         # do the label calculation separately, then merge them
         rpn_rois_list = ['rpn/rpn_rois_%02d' % im for im in range(num_images)]
@@ -485,23 +489,41 @@ class DetectionModelHelper(cnn.CNNModelHelper):
                                                           bg_thresh_lo=cfg.TRAIN.BG_THRESH_LO,
                                                           im=im,
                                                           rng_seed=cfg.RNG_SEED)
-            self.net.CopyCPUToGPU(rois_list[im] + '_host', rois_list[im])
-            self.net.CopyCPUToGPU(labels_list[im] + '_host', labels_list[im])
-            self.net.CopyCPUToGPU(bbox_targets_list[im] + '_host', bbox_targets_list[im])
-            self.net.CopyCPUToGPU(bbox_inside_weights_list[im] + '_host', bbox_inside_weights_list[im])
-            self.net.CopyCPUToGPU(bbox_outside_weights_list[im] + '_host', bbox_outside_weights_list[im])
+            # self.net.CopyCPUToGPU(rois_list[im] + '_host', rois_list[im])
+            # self.net.CopyCPUToGPU(labels_list[im] + '_host', labels_list[im])
+            # self.net.CopyCPUToGPU(bbox_targets_list[im] + '_host', bbox_targets_list[im])
+            # self.net.CopyCPUToGPU(bbox_inside_weights_list[im] + '_host', bbox_inside_weights_list[im])
+            # self.net.CopyCPUToGPU(bbox_outside_weights_list[im] + '_host', bbox_outside_weights_list[im])
 
         # should do the concatenation here
-        rois_out = ['rois', 'rois_split']
-        self.net.Concat(rois_list, rois_out, axis=0)
-        labels_out = ['labels_int32', 'labels_int32_split']
-        self.net.Concat(labels_list, labels_out, axis=0)
-        bbox_targets_out = ['bbox_targets', 'bbox_targets_split']
-        self.net.Concat(bbox_targets_list, bbox_targets_out, axis=0)
-        bbox_inside_weights_out = ['bbox_inside_weights', 'bbox_inside_weights_split']
-        self.net.Concat(bbox_inside_weights_list, bbox_inside_weights_out, axis=0)
-        bbox_outside_weights_out = ['bbox_outside_weights', 'bbox_outside_weights_split']
-        self.net.Concat(bbox_outside_weights_list, bbox_outside_weights_out, axis=0)
+        # rois_out = ['rois', 'rois_split']
+        # self.net.Concat(rois_list, rois_out, axis=0)
+        # labels_out = ['labels_int32', 'labels_int32_split']
+        # self.net.Concat(labels_list, labels_out, axis=0)
+        # bbox_targets_out = ['bbox_targets', 'bbox_targets_split']
+        # self.net.Concat(bbox_targets_list, bbox_targets_out, axis=0)
+        # bbox_inside_weights_out = ['bbox_inside_weights', 'bbox_inside_weights_split']
+        # self.net.Concat(bbox_inside_weights_list, bbox_inside_weights_out, axis=0)
+        # bbox_outside_weights_out = ['bbox_outside_weights', 'bbox_outside_weights_split']
+        # self.net.Concat(bbox_outside_weights_list, bbox_outside_weights_out, axis=0)
+
+        with c2_utils.CpuScope():
+            rois_out = ['rois_host', 'rois_split_host']
+            self.net.Concat([b + '_host' for b in rois_list], rois_out, axis=0)
+            labels_out = ['labels_int32_host', 'labels_int32_split_host']
+            self.net.Concat([b + '_host' for b in labels_list], labels_out, axis=0)
+            bbox_targets_out = ['bbox_targets_host', 'bbox_targets_split_host']
+            self.net.Concat([b + '_host' for b in bbox_targets_list], bbox_targets_out, axis=0)
+            bbox_inside_weights_out = ['bbox_inside_weights_host', 'bbox_inside_weights_split_host']
+            self.net.Concat([b + '_host' for b in bbox_inside_weights_list], bbox_inside_weights_out, axis=0)
+            bbox_outside_weights_out = ['bbox_outside_weights_host', 'bbox_outside_weights_split_host']
+            self.net.Concat([b + '_host' for b in bbox_outside_weights_list], bbox_outside_weights_out, axis=0)
+
+        self.net.CopyCPUToGPU('rois_host', 'rois')
+        self.net.CopyCPUToGPU('labels_int32_host', 'labels_int32')
+        self.net.CopyCPUToGPU('bbox_targets_host', 'bbox_targets')
+        self.net.CopyCPUToGPU('bbox_inside_weights_host', 'bbox_inside_weights')
+        self.net.CopyCPUToGPU('bbox_outside_weights_host', 'bbox_outside_weights')
 
     def GenerateProposalLabelsCppV2(self, use_gpu=True):
         num_images = cfg.TRAIN.IMS_PER_BATCH
@@ -509,12 +531,16 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         fg_rois_per_image = int(np.round(cfg.TRAIN.FG_FRACTION * rois_per_image))
 
         # do the concatenation, this is needed for getting the loss
-        rpn_rois_out = ['rpn_rois', 'rpn_rois_split']
-        rpn_rois = ['rpn_rois_%02d' % im for im in range(num_images)]
-        self.net.Concat(rpn_rois, rpn_rois_out, axis=0)
-        rpn_roi_probs_out = ['rpn_roi_probs', 'rpn_roi_probs_split']
-        rpn_roi_probs = ['rpn_roi_probs_%02d' % im for im in range(num_images)]
-        self.net.Concat(rpn_roi_probs, rpn_roi_probs_out, axis=0)
+        # rpn_rois_out = ['rpn_rois_host', 'rpn_rois_split_host']
+        # rpn_rois = ['rpn/rpn_rois_%02d_host' % im for im in range(num_images)]
+        # rpn_roi_probs_out = ['rpn_roi_probs_host', 'rpn_roi_probs_split_host']
+        # rpn_roi_probs = ['rpn/rpn_roi_probs_%02d_host' % im for im in range(num_images)]
+        # with c2_utils.CpuScope():
+        #     self.net.Concat(rpn_rois, rpn_rois_out, axis=0)
+        #     self.net.Concat(rpn_roi_probs, rpn_roi_probs_out, axis=0)
+        # # then copy it to gpu
+        # self.net.CopyCPUToGPU('rpn_rois_host', 'rpn_rois')
+        # self.net.CopyCPUToGPU('rpn_roi_probs_host', 'rpn_roi_probs')
 
         # do the label calculation separately, then merge them
         rpn_rois_list = ['rpn/rpn_rois_%02d' % im for im in range(num_images)]
@@ -617,6 +643,107 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         )
         return blobs_out
 
+    def CollectAndDistributeFpnRpnProposalsCpp(self):
+        k_max = cfg.FPN.RPN_MAX_LEVEL
+        k_min = cfg.FPN.RPN_MIN_LEVEL
+        num_images = cfg.TRAIN.IMS_PER_BATCH
+        rois_per_image = int(cfg.TRAIN.BATCH_SIZE_PER_IM)
+        fg_rois_per_image = int(np.round(cfg.TRAIN.FG_FRACTION * rois_per_image))
+
+        # collect all the rois from different levels
+        for im in range(num_images):
+            rpn_rois_out = ['rpn_rois_%02d_host' % im, 'rpn_rois_split_%02d_host' % im]
+            rpn_rois = ['rpn/rpn_rois_fpn%d_%02d_host' % (lvl, im) for lvl in range(k_min, k_max+1)]
+            rpn_roi_probs_out = ['rpn_roi_probs_%02d_host' % im, 'rpn_roi_probs_split_%02d_host' % im]
+            rpn_roi_probs = ['rpn/rpn_roi_probs_fpn%d_%02d_host' % (lvl, im) for lvl in range(k_min, k_max+1)]
+            with c2_utils.CpuScope():
+                self.net.Concat(rpn_rois, rpn_rois_out, axis=0)
+                self.net.Concat(rpn_roi_probs, rpn_roi_probs_out, axis=0)
+
+        # do the label calculation separately, then merge them
+        rpn_rois_list = ['rpn_rois_%02d' % im for im in range(num_images)]
+        gt_boxes_list = ['gt_boxes_%02d' % im for im in range(num_images)]
+        gt_classes_list = ['gt_classes_%02d' % im for im in range(num_images)]
+
+        # copy the ground truth annotations to cpu
+        for im in range(num_images):
+            self.net.CopyGPUToCPU(gt_boxes_list[im], gt_boxes_list[im] + '_host')
+            self.net.CopyGPUToCPU(gt_classes_list[im], gt_classes_list[im] + '_host')
+
+        rois_list = ['rois_%02d' % im for im in range(num_images)]
+        labels_list = ['labels_int32_%02d' % im for im in range(num_images)]
+        bbox_targets_list = ['bbox_targets_%02d' % im for im in range(num_images)]
+        bbox_inside_weights_list = ['bbox_inside_weights_%02d' % im for im in range(num_images)]
+        bbox_outside_weights_list = ['bbox_outside_weights_%02d' % im for im in range(num_images)]
+        for im in range(num_images):
+            with c2_utils.CpuScope():
+                self.net.GenerateProposalLabelsSingleImage([rpn_rois_list[im] + '_host', 
+                                                            gt_boxes_list[im] + '_host', 
+                                                            gt_classes_list[im] + '_host', 
+                                                            'im_info_host'], 
+                                                          [rois_list[im] + '_host', 
+                                                           labels_list[im] + '_host', 
+                                                           bbox_targets_list[im] + '_host', 
+                                                           bbox_inside_weights_list[im] + '_host', 
+                                                           bbox_outside_weights_list[im] + '_host'], 
+                                                          num_classes=self.num_classes,
+                                                          rois_per_image=rois_per_image,
+                                                          fg_rois_per_image=fg_rois_per_image,
+                                                          fg_thresh=cfg.TRAIN.FG_THRESH,
+                                                          bg_thresh_hi=cfg.TRAIN.BG_THRESH_HI,
+                                                          bg_thresh_lo=cfg.TRAIN.BG_THRESH_LO,
+                                                          im=im,
+                                                          rng_seed=cfg.RNG_SEED)
+                
+            # self.net.CopyCPUToGPU(labels_list[im] + '_host', labels_list[im])
+            # self.net.CopyCPUToGPU(bbox_targets_list[im] + '_host', bbox_targets_list[im])
+            # self.net.CopyCPUToGPU(bbox_inside_weights_list[im] + '_host', bbox_inside_weights_list[im])
+            # self.net.CopyCPUToGPU(bbox_outside_weights_list[im] + '_host', bbox_outside_weights_list[im])
+
+        # should do the concatenation here
+        rois_final = ['rois_idx_restore_int32']
+        for lvl in range(k_min, k_max+1):
+            rois_final += ['rois_fpn' + str(lvl)]
+        with c2_utils.CpuScope():
+            rois_out = ['rois_host', 'rois_split_host']
+            self.net.Concat([rois + '_host' for rois in rois_list], 
+                            rois_out, 
+                            axis=0)
+            self.net.DistributeFPN(['rois_host'],
+                                    [rois + '_host' for rois in rois_final],
+                                    k_min=k_min,
+                                    k_max=k_max,
+                                    c_scale=cfg.FPN.ROI_CANONICAL_SCALE,
+                                    c_level=cfg.FPN.ROI_CANONICAL_LEVEL)
+
+        for rois in rois_final:
+            self.net.CopyCPUToGPU(rois + '_host', rois)
+        self.net.CopyCPUToGPU('rois_host', 'rois')
+
+        # labels_out = ['labels_int32', 'labels_int32_split']
+        # self.net.Concat(labels_list, labels_out, axis=0)
+        # bbox_targets_out = ['bbox_targets', 'bbox_targets_split']
+        # self.net.Concat(bbox_targets_list, bbox_targets_out, axis=0)
+        # bbox_inside_weights_out = ['bbox_inside_weights', 'bbox_inside_weights_split']
+        # self.net.Concat(bbox_inside_weights_list, bbox_inside_weights_out, axis=0)
+        # bbox_outside_weights_out = ['bbox_outside_weights', 'bbox_outside_weights_split']
+        # self.net.Concat(bbox_outside_weights_list, bbox_outside_weights_out, axis=0)
+
+        with c2_utils.CpuScope():
+            labels_out = ['labels_int32_host', 'labels_int32_split_host']
+            self.net.Concat([b + '_host' for b in labels_list], labels_out, axis=0)
+            bbox_targets_out = ['bbox_targets_host', 'bbox_targets_split_host']
+            self.net.Concat([b + '_host' for b in bbox_targets_list], bbox_targets_out, axis=0)
+            bbox_inside_weights_out = ['bbox_inside_weights_host', 'bbox_inside_weights_split_host']
+            self.net.Concat([b + '_host' for b in bbox_inside_weights_list], bbox_inside_weights_out, axis=0)
+            bbox_outside_weights_out = ['bbox_outside_weights_host', 'bbox_outside_weights_split_host']
+            self.net.Concat([b + '_host' for b in bbox_outside_weights_list], bbox_outside_weights_out, axis=0)
+
+        self.net.CopyCPUToGPU('labels_int32_host', 'labels_int32')
+        self.net.CopyCPUToGPU('bbox_targets_host', 'bbox_targets')
+        self.net.CopyCPUToGPU('bbox_inside_weights_host', 'bbox_inside_weights')
+        self.net.CopyCPUToGPU('bbox_outside_weights_host', 'bbox_outside_weights')
+
     def CollectAndDistributeFpnRpnProposals(self):
         """Merge RPN proposals generated at multiple FPN levels and then
         distribute those proposals to their appropriate FPN levels. An anchor
@@ -691,8 +818,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         method='RoIPoolF',
         resolution=7,
         spatial_scale=1. / 16.,
-        sampling_ratio=0
-    ):
+        sampling_ratio=0):
         """Add the specified RoI pooling method. The sampling_ratio argument
         is supported for some, but not all, RoI transform methods.
 

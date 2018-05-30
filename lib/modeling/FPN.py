@@ -436,7 +436,6 @@ def add_fpn_rpn_outputs(model, blobs_in, dim_in, spatial_scales):
                 anchors=lvl_anchors,
                 spatial_scale=sc
             )
-    # need to somehow merge it
 
 def add_fpn_rpn_losses(model):
     """Add RPN on FPN specific losses."""
@@ -506,9 +505,7 @@ def map_rois_to_fpn_levels(rois, k_min, k_max):
     return target_lvls
 
 
-def add_multilevel_roi_blobs(
-    blobs, blob_prefix, rois, target_lvls, lvl_min, lvl_max
-):
+def add_multilevel_roi_blobs(blobs, blob_prefix, rois, target_lvls, lvl_min, lvl_max):
     """Add RoI blobs for multiple FPN levels to the blobs dict.
 
     blobs: a dict mapping from blob name to numpy ndarray

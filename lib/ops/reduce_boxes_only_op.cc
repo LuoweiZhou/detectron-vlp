@@ -81,10 +81,10 @@ bool ReduceBoxesOnlyOp<float, CPUContext>::RunOnDevice() {
         output_boxes_pointer[k+3] = boxes_pointer[j+2];
         output_boxes_pointer[k+4] = boxes_pointer[j+3];
         const float lvl_assign = _assign_level(boxes_pointer[j+5], 
-                                                  k_min_, 
-                                                  k_max_, 
-                                                  c_scale_f_, 
-                                                  c_level_f_);
+                                                k_min_, 
+                                                k_max_, 
+                                                c_scale_f_, 
+                                                c_level_f_);
         output_boxes_pointer[k+5] = lvl_assign;
         const int lvl = static_cast<int>(lvl_assign) - k_min_;
         output_stats_pointer[lvl] ++;
