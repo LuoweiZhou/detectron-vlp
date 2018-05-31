@@ -473,7 +473,6 @@ class DetectionModelHelper(cnn.CNNModelHelper):
                                                           bg_thresh_lo=cfg.TRAIN.BG_THRESH_LO,
                                                           im=im,
                                                           rng_seed=cfg.RNG_SEED)
-
         with c2_utils.CpuScope():
             rois_out = ['rois_host', 'rois_split_host']
             self.net.Concat([b + '_host' for b in rois_list], rois_out, axis=0)
