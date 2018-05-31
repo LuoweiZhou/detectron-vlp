@@ -151,13 +151,16 @@ class RegionProposalLabelsOpTest(unittest.TestCase):
         min_level = cfg.FPN.RPN_MIN_LEVEL
         for lvl in range(min_level, max_level + 1):
             blobs_out += ['rois_fpn%d' % lvl]
+
         args = {'k_min': min_level,
                 'k_max': max_level,
                 'c_scale': cfg.FPN.ROI_CANONICAL_SCALE,
-                'c_level': cfg.FPN.ROI_CANONICAL_LEVEL}
+                'c_level': cfg.FPN.ROI_CANONICAL_LEVEL
+        }
 
         values_out = self._run_general_op_cpu(op_name, blobs_in, values_in, blobs_out, **args)
         rois_idx = values_out[0]
+
         rois_shuffled = np.vstack(values_out[1:])
 
         return rois_idx, rois_shuffled

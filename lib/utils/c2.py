@@ -145,6 +145,11 @@ def CudaDevice(gpu_id):
     return core.DeviceOption(caffe2_pb2.CUDA, gpu_id)
 
 
+def CpuDevice():
+    """Create a Cuda device."""
+    return core.DeviceOption(caffe2_pb2.CPU)
+
+
 def gauss_fill(std):
     """Gaussian fill helper to reduce verbosity."""
     return ('GaussianFill', {'std': std})

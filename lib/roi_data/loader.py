@@ -182,10 +182,15 @@ class RoIDataLoader(object):
         assert len(blob_names) == len(blobs)
         t = time.time()
         dev = c2_utils.CudaDevice(gpu_id)
+        dev_cpu = c2_utils.CpuDevice()
         queue_name = 'gpu_{}/{}'.format(gpu_id, self._blobs_queue_name)
         blob_names = ['gpu_{}/{}'.format(gpu_id, b) for b in blob_names]
         for (blob_name, blob) in zip(blob_names, blobs):
-            workspace.FeedBlob(blob_name, blob, device_option=dev)
+            if cfg.TRAIN.CPP_RPN and ('gt_boxes' in blob_name or 'gt_classes' in blob_name or 'anchors' in blob_name):
+                workspace.FeedBlob(blob_name, blob, device_option=dev_cpu)
+            else:
+                workspace.FeedBlob(blob_name, blob, device_option=dev)
+
         logger.debug(
             'enqueue_blobs {}: workspace.FeedBlob: {}'.
             format(gpu_id, time.time() - t)

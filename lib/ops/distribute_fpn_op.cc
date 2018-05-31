@@ -74,6 +74,7 @@ bool DistributeFPNOp<float, CPUContext>::RunOnDevice() {
     rois_fpn->Resize(stats_pointer[i], 5);
     fpn_rois_pointers[i] = rois_fpn->mutable_data<float>();
   }
+  
   DCHECK_EQ(now, R);
   // then outputs the rois, from lowest level up
   for (int i=0; i<R; i++) {
