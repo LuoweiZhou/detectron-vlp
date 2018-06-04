@@ -402,7 +402,6 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         
         self.net.CopyGPUToCPU(cp, cp + '_host')
         self.net.CopyGPUToCPU(bp, bp + '_host') 
-        # self.net.CopyGPUToCPU(anchors, anchors + '_host')
         self.net.CopyGPUToCPU(info, info + '_host')
 
         if self.train:
@@ -443,11 +442,6 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         rpn_rois_list = ['rpn/rpn_rois_%02d' % im for im in range(num_images)]
         gt_boxes_list = ['gt_boxes_%02d' % im for im in range(num_images)]
         gt_classes_list = ['gt_classes_%02d' % im for im in range(num_images)]
-
-        # copy the ground truth annotations to cpu
-        # for im in range(num_images):
-        #     self.net.CopyGPUToCPU(gt_boxes_list[im], gt_boxes_list[im] + '_host')
-        #     self.net.CopyGPUToCPU(gt_classes_list[im], gt_classes_list[im] + '_host')
 
         rois_list = ['rois_%02d' % im for im in range(num_images)]
         labels_list = ['labels_int32_%02d' % im for im in range(num_images)]
@@ -621,8 +615,6 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         for im in range(num_images):
             rpn_rois = ['rpn/rpn_rois_fpn%d_%02d_host' % (lvl, im) for lvl in range(k_min, k_max+1)]
             rpn_rois_out = ['rpn_rois_%02d_host' % im, 'rpn_rois_split_%02d_host' % im]
-            # rpn_roi_probs_out = ['rpn_roi_probs_%02d_host' % im, 'rpn_roi_probs_split_%02d_host' % im]
-            # rpn_roi_probs = ['rpn/rpn_roi_probs_fpn%d_%02d_host' % (lvl, im) for lvl in range(k_min, k_max+1)]
             with c2_utils.CpuScope():
                 self.net.Concat(rpn_rois, rpn_rois_out, axis=0)
                 # self.net.Concat(rpn_roi_probs, rpn_roi_probs_out, axis=0)
@@ -631,11 +623,6 @@ class DetectionModelHelper(cnn.CNNModelHelper):
         rpn_rois_list = ['rpn_rois_%02d' % im for im in range(num_images)]
         gt_boxes_list = ['gt_boxes_%02d' % im for im in range(num_images)]
         gt_classes_list = ['gt_classes_%02d' % im for im in range(num_images)]
-
-        # copy the ground truth annotations to cpu
-        # for im in range(num_images):
-        #     self.net.CopyGPUToCPU(gt_boxes_list[im], gt_boxes_list[im] + '_host')
-        #     self.net.CopyGPUToCPU(gt_classes_list[im], gt_classes_list[im] + '_host')
 
         rois_list = ['rois_%02d' % im for im in range(num_images)]
         labels_list = ['labels_int32_%02d' % im for im in range(num_images)]
