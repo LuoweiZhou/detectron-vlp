@@ -369,18 +369,29 @@ class DetectionModelHelper(cnn.CNNModelHelper):
           - 'rpn_roi_probs': 1D tensor of objectness probability scores
             (extracted from rpn_cls_probs; see above).
         """
-        if self.train and cfg.TRAIN.CPP_RPN:
+        if self.train and cfg.TRAIN.CPP_RPN != 'none':
             stride = int(1. / spatial_scale)
-            blobs_out_ims = []
-            for im in range(cfg.TRAIN.IMS_PER_BATCH):
-                blobs_out_ims.extend([ b + '_%02d' % im for b in blobs_out ])
-            if cfg.FPN.FPN_ON and cfg.FPN.MULTILEVEL_RPN:
-                lvl = int(blobs_in[0][-1])
-                anchors = 'anchors_%d' % lvl
-                return self.GenerateProposalsCpp(blobs_in, blobs_out_ims, anchors, stride)
+            if cfg.TRAIN.CPP_RPN == 'all':
+                blobs_out_ims = []
+                for im in range(cfg.TRAIN.IMS_PER_BATCH):
+                    blobs_out_ims.extend([ b + '_%02d' % im for b in blobs_out ])
+                if cfg.FPN.FPN_ON and cfg.FPN.MULTILEVEL_RPN:
+                    lvl = int(blobs_in[0][-1])
+                    anchors = 'anchors_%d' % lvl
+                    return self.GenerateProposalsCpp(blobs_in, blobs_out_ims, anchors, stride)
+                else:
+                    anchors = 'anchors'
+                    return self.GenerateProposalsCpp(blobs_in, blobs_out_ims, anchors, stride)
+            elif cfg.TRAIN.CPP_RPN == 'proposals':
+                if cfg.FPN.FPN_ON and cfg.FPN.MULTILEVEL_RPN:
+                    lvl = int(blobs_in[0][-1])
+                    anchors = 'anchors_%d' % lvl
+                    return self.GenerateProposalsCppForLabels(blobs_in, blobs_out, anchors, stride)
+                else:
+                    anchors = 'anchors'
+                    return self.GenerateProposalsCppForLabels(blobs_in, blobs_out, anchors, stride)
             else:
-                anchors = 'anchors'
-                return self.GenerateProposalsCpp(blobs_in, blobs_out_ims, anchors, stride)
+                raise NotImplementedError
         else:
             return self.GenerateProposalsPython(blobs_in, blobs_out, anchors, spatial_scale)
 
@@ -431,6 +442,93 @@ class DetectionModelHelper(cnn.CNNModelHelper):
             rois.append(blobs_out_im[0] + '_host')
             roi_probs.append(blobs_out_im[1] + '_host')
 
+        return blobs_out
+
+    def GenerateProposalsCppForLabels(self, blobs_in, blobs_out, anchors, stride):
+        rpn_scope = 'rpn/'
+        num_images = cfg.TRAIN.IMS_PER_BATCH if self.train else 1
+        cp = blobs_in[0]
+        bp = blobs_in[1]
+        info = blobs_in[2]
+        
+        self.net.CopyGPUToCPU(cp, cp + '_host')
+        self.net.CopyGPUToCPU(bp, bp + '_host') 
+        self.net.CopyGPUToCPU(info, info + '_host')
+
+        if self.train:
+            pre_nms_topN = cfg.TRAIN.RPN_PRE_NMS_TOP_N
+            post_nms_topN = cfg.TRAIN.RPN_POST_NMS_TOP_N
+            nms_thresh = cfg.TRAIN.RPN_NMS_THRESH
+            num_images = cfg.TRAIN.IMS_PER_BATCH
+        else:
+            pre_nms_topN = cfg.TEST.RPN_PRE_NMS_TOP_N
+            post_nms_topN = cfg.TEST.RPN_POST_NMS_TOP_N
+            nms_thresh = cfg.TEST.RPN_NMS_THRESH
+            num_images = 1
+
+        rois = []
+        roi_probs = []
+        for im in range(num_images):
+            blobs_out_im = [rpn_scope + blobs_out[0] + '_%02d' % im,
+                            rpn_scope + blobs_out[1] + '_%02d' % im]
+            with c2_utils.CpuScope():
+                self.net.GenerateProposalsSingleImage([cp + '_host', bp + '_host', anchors, info + '_host'], 
+                                                      [blob + '_host' for blob in blobs_out_im], 
+                                                      pre_top_n=pre_nms_topN,
+                                                      post_top_n=post_nms_topN,
+                                                      nms_thresh=nms_thresh,
+                                                      im=im,
+                                                      stride=stride)
+            rois.append(blobs_out_im[0] + '_host')
+            roi_probs.append(blobs_out_im[1] + '_host')
+
+        # then just combine all of them
+        rois_out = [rpn_scope + blobs_out[0] + '_host',
+                    rpn_scope + blobs_out[0] + '_split']
+        roi_probs_out = [rpn_scope + blobs_out[1] + '_host',
+                        rpn_scope + blobs_out[1] + '_split']
+        with c2_utils.CpuScope():
+            self.net.Concat(rois, rois_out, axis=0)
+            self.net.Concat(roi_probs, roi_probs_out, axis=0)
+
+        # copy it back
+        self.net.CopyCPUToGPU(rpn_scope + blobs_out[0] + '_host', blobs_out[0])
+        self.net.CopyCPUToGPU(rpn_scope + blobs_out[1] + '_host', blobs_out[1])
+        # self.net.Alias(rpn_scope + blobs_out[0] + '_host', blobs_out[0])
+        # self.net.Alias(rpn_scope + blobs_out[1] + '_host', blobs_out[1])
+
+        return blobs_out
+
+    def GenerateProposalLabels(self, blobs_in):
+        """Op for generating training labels for RPN proposals. This is used
+        when training RPN jointly with Fast/Mask R-CNN (as in end-to-end
+        Faster R-CNN training).
+
+        blobs_in:
+          - 'rpn_rois': 2D tensor of RPN proposals output by GenerateProposals
+          - 'roidb': roidb entries that will be labeled
+          - 'im_info': See GenerateProposals doc.
+
+        blobs_out:
+          - (variable set of blobs): returns whatever blobs are required for
+            training the model. It does this by querying the data loader for
+            the list of blobs that are needed.
+        """
+        name = 'GenerateProposalLabelsOp:' + ','.join(
+            [str(b) for b in blobs_in]
+        )
+
+        # The list of blobs is not known before run-time because it depends on
+        # the specific model being trained. Query the data loader to get the
+        # list of output blob names.
+        blobs_out = roi_data.fast_rcnn.get_fast_rcnn_blob_names(
+            is_training=self.train
+        )
+        blobs_out = [core.ScopedBlobReference(b) for b in blobs_out]
+
+        self.net.Python(GenerateProposalLabelsOp().forward)(
+            blobs_in, blobs_out, name=name
+        )
         return blobs_out
 
     def GenerateProposalLabelsCpp(self):
@@ -571,38 +669,6 @@ class DetectionModelHelper(cnn.CNNModelHelper):
             self.net.CopyCPUToGPU('bbox_targets_host', 'bbox_targets')
             self.net.CopyCPUToGPU('bbox_inside_weights_host', 'bbox_inside_weights')
             self.net.CopyCPUToGPU('bbox_outside_weights_host', 'bbox_outside_weights')
-
-    def GenerateProposalLabels(self, blobs_in):
-        """Op for generating training labels for RPN proposals. This is used
-        when training RPN jointly with Fast/Mask R-CNN (as in end-to-end
-        Faster R-CNN training).
-
-        blobs_in:
-          - 'rpn_rois': 2D tensor of RPN proposals output by GenerateProposals
-          - 'roidb': roidb entries that will be labeled
-          - 'im_info': See GenerateProposals doc.
-
-        blobs_out:
-          - (variable set of blobs): returns whatever blobs are required for
-            training the model. It does this by querying the data loader for
-            the list of blobs that are needed.
-        """
-        name = 'GenerateProposalLabelsOp:' + ','.join(
-            [str(b) for b in blobs_in]
-        )
-
-        # The list of blobs is not known before run-time because it depends on
-        # the specific model being trained. Query the data loader to get the
-        # list of output blob names.
-        blobs_out = roi_data.fast_rcnn.get_fast_rcnn_blob_names(
-            is_training=self.train
-        )
-        blobs_out = [core.ScopedBlobReference(b) for b in blobs_out]
-
-        self.net.Python(GenerateProposalLabelsOp().forward)(
-            blobs_in, blobs_out, name=name
-        )
-        return blobs_out
 
     def CollectAndDistributeFpnRpnProposalsCpp(self):
         k_max = cfg.FPN.RPN_MAX_LEVEL

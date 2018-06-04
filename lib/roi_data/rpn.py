@@ -45,7 +45,7 @@ def get_rpn_blob_names(is_training=True):
                     
     if is_training:
         # gt boxes: (batch_idx, x1, y1, x2, y2, cls)
-        if cfg.TRAIN.CPP_RPN:
+        if cfg.TRAIN.CPP_RPN == 'all':
             num_images = cfg.TRAIN.IMS_PER_BATCH
             for im in range(num_images):
                 blob_names += ['gt_boxes_%02d' % im, 
@@ -105,12 +105,6 @@ def add_rpn_blobs(blobs, im_scales, roidb):
             (entry['gt_classes'] > 0) & (entry['is_crowd'] == 0)
         )[0]
         gt_rois = entry['boxes'][gt_inds, :] * scale
-        # TODO(rbg): gt_boxes is poorly named;
-        # should be something like 'gt_rois_info'
-        # gt_boxes = blob_utils.zeros((len(gt_inds), 6))
-        # gt_boxes[:, 0] = im_i  # batch inds
-        # gt_boxes[:, 1:5] = gt_rois
-        # gt_boxes[:, 5] = entry['gt_classes'][gt_inds]
         im_info = np.array([[im_height, im_width, scale]], dtype=np.float32)
         blobs['im_info'].append(im_info)
 
@@ -135,7 +129,7 @@ def add_rpn_blobs(blobs, im_scales, roidb):
         if isinstance(v, list) and len(v) > 0:
             blobs[k] = np.concatenate(v)
 
-    if cfg.TRAIN.CPP_RPN:
+    if cfg.TRAIN.CPP_RPN == 'all':
         for im_i, entry in enumerate(roidb):
             scale = im_scales[im_i]
             gt_inds = np.where((entry['gt_classes'] > 0) & (entry['is_crowd'] == 0))[0]

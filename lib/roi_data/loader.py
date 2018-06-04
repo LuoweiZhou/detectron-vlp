@@ -186,7 +186,7 @@ class RoIDataLoader(object):
         queue_name = 'gpu_{}/{}'.format(gpu_id, self._blobs_queue_name)
         blob_names = ['gpu_{}/{}'.format(gpu_id, b) for b in blob_names]
         for (blob_name, blob) in zip(blob_names, blobs):
-            if cfg.TRAIN.CPP_RPN and ('gt_boxes' in blob_name or 'gt_classes' in blob_name or 'anchors' in blob_name):
+            if cfg.TRAIN.CPP_RPN != 'none' and ('gt_boxes' in blob_name or 'gt_classes' in blob_name or 'anchors' in blob_name):
                 workspace.FeedBlob(blob_name, blob, device_option=dev_cpu)
             else:
                 workspace.FeedBlob(blob_name, blob, device_option=dev)

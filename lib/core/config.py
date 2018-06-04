@@ -272,7 +272,7 @@ __C.TRAIN.FREEZE_CONV_BODY = False
 __C.TRAIN.AUTO_RESUME = True
 
 # Get the blobs from information
-__C.TRAIN.CPP_RPN = False
+__C.TRAIN.CPP_RPN = 'none'
 
 
 # ---------------------------------------------------------------------------- #
