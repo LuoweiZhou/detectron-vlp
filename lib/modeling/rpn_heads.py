@@ -41,7 +41,7 @@ def add_generic_rpn_outputs(model, blob_in, dim_in, spatial_scale_in):
         if cfg.MODEL.FASTER_RCNN:
             # CollectAndDistributeFpnRpnProposals also labels proposals when in
             # training mode
-            if cfg.TRAIN.CPP_RPN == 'all':
+            if model.train and cfg.TRAIN.CPP_RPN == 'all':
                 model.CollectAndDistributeFpnRpnProposalsCpp()
             else:
                 model.CollectAndDistributeFpnRpnProposals()
