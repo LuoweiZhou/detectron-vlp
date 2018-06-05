@@ -170,8 +170,6 @@ def test_net_on_dataset(
 def multi_gpu_test_net_on_dataset(
     weights_file, dataset_name, proposal_file, num_images, output_dir
 ):
-    import pdb
-    pdb.set_trace()
     """Multi-gpu inference on a dataset."""
     binary_dir = envu.get_runtime_dir()
     binary_ext = envu.get_py_bin_ext()

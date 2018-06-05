@@ -29,7 +29,7 @@ _CMAKE_INSTALL_PREFIX = '/usr/local'
 
 def get_runtime_dir():
     """Retrieve the path to the runtime directory."""
-    return '/private/home/xinleic/vqa/tools'
+    return '/private/home/xinleic/pyramid/tools'
 
 
 def get_py_bin_ext():
