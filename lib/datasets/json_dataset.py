@@ -332,7 +332,8 @@ class JsonDataset(object):
                 'left_wrist': 'right_wrist',
                 'left_hip': 'right_hip',
                 'left_knee': 'right_knee',
-                'left_ankle': 'right_ankle'}
+                'left_ankle': 'right_ankle'
+            }
 
     def _get_gt_keypoints(self, obj):
         """Return ground truth keypoints."""
