@@ -146,8 +146,8 @@ bool GenerateProposalsSingleImageOp<float, CPUContext>::RunOnDevice() {
     const float ctr_x = x1 + 0.5 * ww;
     const float ctr_y = y1 + 0.5 * hh;
 
-    const float pred_ctr_x = dx * ww + ctr_x;
-    const float pred_ctr_y = dy * hh + ctr_y;
+    float pred_ctr_x = dx * ww + ctr_x;
+    float pred_ctr_y = dy * hh + ctr_y;
     float pred_w = exp(dw) * ww;
     float pred_h = exp(dh) * hh;
 
@@ -158,6 +158,8 @@ bool GenerateProposalsSingleImageOp<float, CPUContext>::RunOnDevice() {
 
     pred_w = xx2 - xx1 + 1.;
     pred_h = yy2 - yy1 + 1.;
+    pred_ctr_x = xx1 + 0.5 * pred_w;
+    pred_ctr_y = yy1 + 0.5 * pred_h;
 
     rois_raw_pointer[bbp] = xx1;
     rois_raw_pointer[bbp+1] = yy1;
@@ -165,7 +167,7 @@ bool GenerateProposalsSingleImageOp<float, CPUContext>::RunOnDevice() {
     rois_raw_pointer[bbp+3] = yy2;
     rois_raw_pointer[bbp+4] = pred_w * pred_h;
     // not suppressed
-    rois_raw_pointer[bbp+5] = (pred_w < 1. || pred_h < 1.) ? 1. : 0.;
+    rois_raw_pointer[bbp+5] = (pred_w < 0. || pred_h < 0. || pred_ctr_x > width_max || pred_ctr_y > height_max) ? 1. : 0.;
     index_list.push_back(make_pair(yv_data[r], r));
   }
 

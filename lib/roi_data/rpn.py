@@ -135,6 +135,7 @@ def add_rpn_blobs(blobs, im_scales, roidb):
             gt_inds = np.where(entry['gt_classes'] > 0)[0]
             # gt_inds = np.where((entry['gt_classes'] > 0) & (entry['is_crowd'] == 0))[0]
             blobs['gt_boxes_%02d' % im_i] = entry['boxes'][gt_inds, :] * scale
+            # blobs['gt_boxes_%02d' % im_i] = entry['boxes'][gt_inds, :]
             blobs['gt_classes_%02d' % im_i] = entry['gt_classes'][gt_inds]
     else:
         valid_keys = [

@@ -81,6 +81,7 @@ bool GenerateProposalLabelsSingleImageOp<float, CPUContext>::RunOnDevice() {
   const float* gt_boxes_pointer = gt_boxes.data<float>();
   const int* gt_classes_pointer = gt_classes.data<int>();
   const float* im_info_pointer = im_info.data<float>() + im_ * 3;
+  const float im_scale = im_info_pointer[2];
 
   const int R = rpn_rois.dim32(0);
   const int G = gt_boxes.dim32(0);
@@ -98,7 +99,7 @@ bool GenerateProposalLabelsSingleImageOp<float, CPUContext>::RunOnDevice() {
     const float x2A = rpn_rois_pointer[Ap+3];
     const float y2A = rpn_rois_pointer[Ap+4];
     const float areaA = (x2A - x1A + 1.) * (y2A - y1A + 1.);
-    float max_iou = -1.;
+    float max_iou = 0.;
     int gt_assign = -1;
     for (int j=0; j<G; j++) {
       const int Bp = j * 4;

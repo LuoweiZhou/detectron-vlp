@@ -361,12 +361,13 @@ def add_proposals(roidb, rois, scales, crowd_thresh):
     specify the scale factor that separate them in scales.
     """
     box_list = []
-    # place it back
+    # place it back, with the scales
     for i in range(len(roidb)):
         inv_im_scale = 1. / scales[i]
         idx = np.where(rois[:, 0] == i)[0]
         box_list.append(rois[idx, 1:] * inv_im_scale)
     _merge_proposal_boxes_into_roidb(roidb, box_list)
+    # there is no filtering of crowd proposals
     if crowd_thresh > 0:
         _filter_crowd_proposals(roidb, crowd_thresh)
     _add_class_assignments(roidb)
@@ -375,6 +376,7 @@ def add_proposals(roidb, rois, scales, crowd_thresh):
 def _merge_proposal_boxes_into_roidb(roidb, box_list):
     """Add proposal boxes to each roidb entry."""
     assert len(box_list) == len(roidb)
+    # for each of the images, merge the proposals
     for i, entry in enumerate(roidb):
         boxes = box_list[i]
         num_boxes = boxes.shape[0]
