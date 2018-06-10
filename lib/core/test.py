@@ -117,7 +117,6 @@ def im_conv_body_only(model, im, target_scale, target_max_size):
     workspace.RunNet(model.conv_body_net.Proto().name)
     return im_scale
 
-
 def im_detect_bbox(model, im, target_scale, target_max_size, boxes=None):
     """Bounding box object detection for an image with given box proposals.
 
@@ -136,7 +135,6 @@ def im_detect_bbox(model, im, target_scale, target_max_size, boxes=None):
     """
 
     inputs, im_scale = _get_blobs(im, boxes, target_scale, target_max_size)
-
     # When mapping from image ROIs to feature map ROIs, there's some aliasing
     # (some distinct image ROIs get mapped to the same feature ROI).
     # Here, we identify duplicate feature ROIs, so we only compute features
@@ -156,6 +154,7 @@ def im_detect_bbox(model, im, target_scale, target_max_size, boxes=None):
 
     for k, v in inputs.items():
         workspace.FeedBlob(core.ScopedName(k), v)
+
     workspace.RunNet(model.net.Proto().name)
 
     # Read out blobs

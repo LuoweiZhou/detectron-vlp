@@ -28,6 +28,7 @@ import numpy as np
 import os
 import yaml
 
+from caffe2.python import core
 from caffe2.python import workspace
 
 from core.config import cfg
@@ -38,6 +39,7 @@ from core.test import im_detect_all
 from datasets import task_evaluation
 from datasets.json_dataset import JsonDataset
 from modeling import model_builder
+import roi_data.data_utils as data_utils
 from utils.io import save_object
 from utils.timer import Timer
 import utils.c2 as c2_utils
@@ -48,6 +50,27 @@ import utils.vis as vis_utils
 
 logger = logging.getLogger(__name__)
 
+def _create_anchors():
+    blobs = {}
+    if cfg.FPN.FPN_ON and cfg.FPN.MULTILEVEL_RPN:
+        # RPN applied to many feature levels, as in the FPN paper
+        k_max = cfg.FPN.RPN_MAX_LEVEL
+        k_min = cfg.FPN.RPN_MIN_LEVEL
+        for lvl in range(k_min, k_max + 1):
+            field_stride = 2.**lvl
+            anchor_sizes = (cfg.FPN.RPN_ANCHOR_START_SIZE * 2.**(lvl - k_min), )
+            anchor_aspect_ratios = cfg.FPN.RPN_ASPECT_RATIOS
+            foa = data_utils.get_field_of_anchors(
+                field_stride, anchor_sizes, anchor_aspect_ratios
+            )
+            blobs['anchors_%d' % lvl] = foa.cell_anchors
+    else:
+        foa = data_utils.get_field_of_anchors(
+            cfg.RPN.STRIDE, cfg.RPN.SIZES, cfg.RPN.ASPECT_RATIOS
+        )
+        all_anchors = foa.field_of_anchors
+        blobs['anchors'] = foa.cell_anchors
+    return blobs
 
 def get_eval_functions():
     # Determine which parent or child function should handle inference
@@ -231,6 +254,12 @@ def test_net(
     num_classes = cfg.MODEL.NUM_CLASSES
     all_boxes, all_segms, all_keyps = empty_results(num_classes, num_images)
     timers = defaultdict(Timer)
+
+    anchor_blobs = _create_anchors()
+    with c2_utils.NamedCpuScope(gpu_id):
+        for k, v in anchor_blobs.items():
+            workspace.FeedBlob(core.ScopedName(k), v)
+
     for i, entry in enumerate(roidb):
         if cfg.TEST.PRECOMPUTED_PROPOSALS:
             # The roidb may contain ground-truth rois (for example, if the roidb

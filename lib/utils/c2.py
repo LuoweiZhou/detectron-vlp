@@ -116,6 +116,11 @@ def NamedCudaScope(gpu_id):
         with CudaScope(gpu_id):
             yield
 
+@contextlib.contextmanager
+def NamedCpuScope(gpu_id):
+    with GpuNameScope(gpu_id):
+        with CpuScope():
+            yield
 
 @contextlib.contextmanager
 def GpuNameScope(gpu_id):

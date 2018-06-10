@@ -369,31 +369,31 @@ class DetectionModelHelper(cnn.CNNModelHelper):
           - 'rpn_roi_probs': 1D tensor of objectness probability scores
             (extracted from rpn_cls_probs; see above).
         """
-        if cfg.TRAIN.CPP_RPN != 'none':
+        if cfg.TRAIN.CPP_RPN == 'proposals':
             stride = int(1. / spatial_scale)
-            if cfg.TRAIN.CPP_RPN == 'all':
-                blobs_out_ims = []
-                for im in range(cfg.TRAIN.IMS_PER_BATCH):
-                    blobs_out_ims.extend([ b + '_%02d' % im for b in blobs_out ])
-                if cfg.FPN.FPN_ON and cfg.FPN.MULTILEVEL_RPN:
-                    lvl = int(blobs_in[0][-1])
-                    anchors = 'anchors_%d' % lvl
-                    return self.GenerateProposalsCpp(blobs_in, blobs_out_ims, anchors, stride)
-                else:
-                    anchors = 'anchors'
-                    return self.GenerateProposalsCpp(blobs_in, blobs_out_ims, anchors, stride)
-            elif cfg.TRAIN.CPP_RPN == 'proposals':
-                if cfg.FPN.FPN_ON and cfg.FPN.MULTILEVEL_RPN:
-                    lvl = int(blobs_in[0][-1])
-                    anchors = 'anchors_%d' % lvl
-                    return self.GenerateProposalsCppForLabels(blobs_in, blobs_out, anchors, stride)
-                else:
-                    anchors = 'anchors'
-                    return self.GenerateProposalsCppForLabels(blobs_in, blobs_out, anchors, stride)
+            if cfg.FPN.FPN_ON and cfg.FPN.MULTILEVEL_RPN:
+                lvl = int(blobs_in[0][-1])
+                anchors = 'anchors_%d' % lvl
+                return self.GenerateProposalsCppForLabels(blobs_in, blobs_out, anchors, stride)
             else:
-                raise NotImplementedError
-        else:
+                anchors = 'anchors'
+                return self.GenerateProposalsCppForLabels(blobs_in, blobs_out, anchors, stride)
+        elif cfg.TRAIN.CPP_RPN == 'all':
+            stride = int(1. / spatial_scale)
+            blobs_out_ims = []
+            for im in range(cfg.TRAIN.IMS_PER_BATCH):
+                blobs_out_ims.extend([ b + '_%02d' % im for b in blobs_out ])
+            if cfg.FPN.FPN_ON and cfg.FPN.MULTILEVEL_RPN:
+                lvl = int(blobs_in[0][-1])
+                anchors = 'anchors_%d' % lvl
+                return self.GenerateProposalsCpp(blobs_in, blobs_out_ims, anchors, stride)
+            else:
+                anchors = 'anchors'
+                return self.GenerateProposalsCpp(blobs_in, blobs_out_ims, anchors, stride)
+        elif cfg.TRAIN.CPP_RPN == 'none':
             return self.GenerateProposalsPython(blobs_in, blobs_out, anchors, spatial_scale)
+        else:
+            raise NotImplementedError
 
     def GenerateProposalsPython(self, blobs_in, blobs_out, anchors, spatial_scale):
         name = 'GenerateProposalsOp:' + ','.join([str(b) for b in blobs_in])
