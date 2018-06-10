@@ -137,7 +137,7 @@ def add_rpn_blobs(blobs, im_scales, roidb):
             # blobs['gt_boxes_%02d' % im_i] = entry['boxes'][gt_inds, :] * scale
             gt_boxes = entry['boxes'][gt_inds, :] * scale
             gt_areas = (gt_boxes[:, 2] - gt_boxes[:, 0] + 1.) * (gt_boxes[:, 3] - gt_boxes[:, 1] + 1.)
-            blobs['gt_boxes_%02d' % im_i] = hstack((gt_boxes, gt_areas))
+            blobs['gt_boxes_%02d' % im_i] = np.hstack((gt_boxes, gt_areas[:,np.newaxis]))
             # blobs['gt_boxes_%02d' % im_i] = entry['boxes'][gt_inds, :]
             blobs['gt_classes_%02d' % im_i] = entry['gt_classes'][gt_inds]
     else:

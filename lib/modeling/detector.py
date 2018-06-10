@@ -369,7 +369,7 @@ class DetectionModelHelper(cnn.CNNModelHelper):
           - 'rpn_roi_probs': 1D tensor of objectness probability scores
             (extracted from rpn_cls_probs; see above).
         """
-        if cfg.TRAIN.CPP_RPN == 'proposals':
+        if cfg.TRAIN.CPP_RPN == 'proposals' or (not self.train and cfg.TRAIN.CPP_RPN == 'all'):
             stride = int(1. / spatial_scale)
             if cfg.FPN.FPN_ON and cfg.FPN.MULTILEVEL_RPN:
                 lvl = int(blobs_in[0][-1])
