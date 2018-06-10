@@ -78,6 +78,8 @@ bool GenerateProposalLabelsSingleImageOp<float, CPUContext>::RunOnDevice() {
   auto& im_info = Input(3);
 
   const float* rpn_rois_pointer = rpn_rois.data<float>();
+  // there should be at least one proposal I think
+  DCHECK_EQ(im_, static_cast<int>(rpn_rois_pointer[0]));
   const float* gt_boxes_pointer = gt_boxes.data<float>();
   const int* gt_classes_pointer = gt_classes.data<int>();
   const float* im_info_pointer = im_info.data<float>() + im_ * 3;
@@ -102,12 +104,12 @@ bool GenerateProposalLabelsSingleImageOp<float, CPUContext>::RunOnDevice() {
     float max_iou = 0.;
     int gt_assign = -1;
     for (int j=0; j<G; j++) {
-      const int Bp = j * 4;
+      const int Bp = j * 5;
       const float x1B = gt_boxes_pointer[Bp];
       const float y1B = gt_boxes_pointer[Bp+1];
       const float x2B = gt_boxes_pointer[Bp+2];
       const float y2B = gt_boxes_pointer[Bp+3];
-      const float areaB = (x2B - x1B + 1.) * (y2B - y1B + 1.);
+      const float areaB = gt_boxes_pointer[Bp+4];
 
       const float xx1 = (x1A > x1B) ? x1A : x1B;
       const float yy1 = (y1A > y1B) ? y1A : y1B;
@@ -137,14 +139,22 @@ bool GenerateProposalLabelsSingleImageOp<float, CPUContext>::RunOnDevice() {
   const int fg_cnt = fg_candidates.size();
   const int bg_cnt = bg_candidates.size();
 
-  // then sample the candidates
-  const int this_fg_cnt = (fg_cnt < fg_rois_per_image_) ? fg_cnt : fg_rois_per_image_;
-  const int this_bg_cnt = (bg_cnt < (rois_per_image_ - this_fg_cnt)) ? bg_cnt : (rois_per_image_ - this_fg_cnt);
+  // then sample the candidates, conditionally shuffle the candidates
+  int this_fg_cnt;
+  if (fg_cnt < fg_rois_per_image_) {
+    this_fg_cnt = fg_cnt;
+  } else {
+    this_fg_cnt = fg_rois_per_image_;
+    shuffle(fg_candidates.begin(), fg_candidates.end(), rng_);
+  }
+  int this_bg_cnt;
+  if (bg_cnt < (rois_per_image_ - this_fg_cnt)) {
+    this_bg_cnt = bg_cnt;
+  } else {
+    this_bg_cnt = (rois_per_image_ - this_fg_cnt);
+    shuffle(bg_candidates.begin(), bg_candidates.end(), rng_);
+  }
   const int this_cnt = this_fg_cnt + this_bg_cnt;
-
-  // shuffle the candidates
-  shuffle(fg_candidates.begin(), fg_candidates.end(), rng_);
-  shuffle(bg_candidates.begin(), bg_candidates.end(), rng_);
 
   auto* rois = Output(0);
   auto* labels = Output(1);
@@ -177,7 +187,7 @@ bool GenerateProposalLabelsSingleImageOp<float, CPUContext>::RunOnDevice() {
     float x1A, y1A, x2A, y2A;
 
     if (this_id < G) {
-      const int Ap = this_id * 4;
+      const int Ap = this_id * 5;
       x1A = gt_boxes_pointer[Ap];
       y1A = gt_boxes_pointer[Ap+1];
       x2A = gt_boxes_pointer[Ap+2];
@@ -200,7 +210,7 @@ bool GenerateProposalLabelsSingleImageOp<float, CPUContext>::RunOnDevice() {
     const int this_label = gt_classes_pointer[gt_id];
     labels_pointer[i] = this_label;
 
-    const int Bp = gt_id * 4;
+    const int Bp = gt_id * 5;
     const float x1B = gt_boxes_pointer[Bp];
     const float y1B = gt_boxes_pointer[Bp+1];
     const float x2B = gt_boxes_pointer[Bp+2];

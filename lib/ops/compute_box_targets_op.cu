@@ -63,7 +63,7 @@ __global__ void GetBoxes(const int nthreads,
     if (this_label > 0) {
       const int gt_id = targets_pointer[index];
       const int Ap = index * 5;
-      const int Bp = gt_id * 4;
+      const int Bp = gt_id * 5;
       _compute_targets(rois_pointer[Ap+1], rois_pointer[Ap+2], 
                       rois_pointer[Ap+3], rois_pointer[Ap+4],
                       gt_boxes_pointer[Bp], gt_boxes_pointer[Bp+1], 
