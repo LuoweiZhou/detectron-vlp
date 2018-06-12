@@ -45,3 +45,15 @@ def get_coco_dataset():
     ]
     ds.classes = {i: name for i, name in enumerate(classes)}
     return ds
+
+def get_vg_dataset():
+    ds = AttrDict()
+
+    obj_cls_file = '/private/home/tinayujiang/data/VisualGenome1.2_in_COCO_format/data_from_peter_anderson/1600-400-20/objects_vocab.txt'
+    with open(obj_cls_file) as f:
+        data = f.readlines()
+        classes = ['__background__']
+        classes.extend([i.strip() for i in data])
+
+    ds.classes = {i: name for i, name in enumerate(classes)}
+    return ds
