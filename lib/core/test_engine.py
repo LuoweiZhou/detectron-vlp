@@ -35,7 +35,7 @@ from core.config import cfg
 from core.config import get_output_dir
 from core.rpn_generator import generate_rpn_on_dataset
 from core.rpn_generator import generate_rpn_on_range
-from core.test import im_detect_all
+from core.test import im_detect_all, im_detect_bbox
 from datasets import task_evaluation
 from datasets.json_dataset import JsonDataset
 from modeling import model_builder
