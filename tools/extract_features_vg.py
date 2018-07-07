@@ -38,6 +38,7 @@ import csv
 import timeit
 import json
 import h5py
+import itertools
 
 from utils.io import cache_url
 import utils.c2 as c2_utils
@@ -214,8 +215,8 @@ def main(args):
         if args.dataset == 'Flickr30k':
             im_list = glob.iglob(args.im_or_folder + '/*.' + args.image_ext)
         elif args.dataset == 'COCO':
-            im_list = glob.iglob(args.im_or_folder + '/train2014/*.' + args.image_ext) + \
-                      glob.iglob(args.im_or_folder + '/val2014/*.' + args.image_ext)
+            im_list = itertools.chain(glob.iglob(args.im_or_folder + '/train2014/*.' + args.image_ext),
+                      glob.iglob(args.im_or_folder + '/val2014/*.' + args.image_ext))
     else:
         im_list = [args.im_or_folder]
 
