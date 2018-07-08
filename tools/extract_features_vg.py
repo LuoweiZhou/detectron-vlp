@@ -155,6 +155,13 @@ def get_detections_from_im(cfg, model, im, image_id, feat_blob_name ,MIN_BOXES, 
         box_features = workspace.FetchBlob(feat_blob_name)
         cls_prob = workspace.FetchBlob("gpu_0/cls_prob")
         rois = workspace.FetchBlob("gpu_0/rois")
+        fc6_feat = workspace.FetchBlob("gpu_0/fc6")
+        # print('fc6 feat size: ', fc6_feat.shape)
+        # res4_feat = workspace.FetchBlob("gpu_0/res4_22_sum")
+        # roi_feat = workspace.FetchBlob("gpu_0/roi_feat")
+        # print('roi feat size: ', workspace.FetchBlob("gpu_0/roi_feat").shape)
+        # print('res4 output: ', res4_feat.shape)
+        # print('res5 output: ', workspace.FetchBlob("gpu_0/res5_2_sum").shape)
         max_conf = np.zeros((rois.shape[0]))
         # unscale back to raw image space
         cls_boxes = rois[:, 1:5] / im_scale
@@ -194,6 +201,8 @@ def get_detections_from_im(cfg, model, im, image_id, feat_blob_name ,MIN_BOXES, 
         'num_boxes': len(keep_boxes),
         'boxes': cls_boxes[keep_boxes],
         'features': box_features[keep_boxes],
+        'fc6_feat': fc6_feat[keep_boxes],
+        # 'roi_feat': roi_feat[keep_boxes],
         'object': objects,
         'obj_prob': obj_prob
         # 'boxes': base64.b64encode(cls_boxes[keep_boxes]),
@@ -233,6 +242,8 @@ def main(args):
     N = len(info['images'])
     dets_labels = np.zeros((N, 100, 6))
     dets_feat = np.zeros((N, 100, 2048))
+    fc6_feat = np.zeros((N, 100, 2048))
+    # roi_feat = np.zeros((N, 100, 512, 7, 7))
     dets_num = np.zeros((N))
     nms_num = np.zeros((N))
 
@@ -252,6 +263,8 @@ def main(args):
         proposals = np.concatenate((result['boxes'], np.expand_dims(result['object'], axis=1),
                                     np.expand_dims(result['obj_prob'], axis=1)), axis=1)
         dets_feat[i, :num_proposal] = result['features']
+        fc6_feat[i, :num_proposal] = result['fc6_feat']
+        # roi_feat[i, :num_proposal] = result['roi_feat']
 
         dets_labels[i, :num_proposal] = proposals
         dets_num[i] = num_proposal
@@ -267,6 +280,8 @@ def main(args):
     f = h5py.File(args.det_output_file, "w")
     f.create_dataset("dets_labels", data=dets_labels)
     f.create_dataset("dets_feat", data=dets_feat)
+    f.create_dataset("fc6_feat", data=fc6_feat)
+    # f.create_dataset("roi_feat", data=roi_feat)
     f.create_dataset("dets_num", data=dets_num)
     f.create_dataset("nms_num", data=nms_num)
     f.close()
