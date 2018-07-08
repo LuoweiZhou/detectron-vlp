@@ -226,6 +226,8 @@ def main(args):
         elif args.dataset == 'COCO':
             im_list = itertools.chain(glob.iglob(args.im_or_folder + '/train2014/*.' + args.image_ext),
                       glob.iglob(args.im_or_folder + '/val2014/*.' + args.image_ext))
+        else:
+            raise NotImplementedError
     else:
         im_list = [args.im_or_folder]
 
@@ -255,7 +257,13 @@ def main(args):
         # out_name =  "COCO_genome_%012d.jpg"%image_id
 
         image_id = str(img_id['id'])
-        im_name = os.path.join(args.im_or_folder, str(image_id)+'.jpg')
+        if args.dataset == 'Flickr30k':
+            im_name = os.path.join(args.im_or_folder, image_id+'.jpg')
+        elif args.dataset == 'COCO':
+            im_name = os.path.join(args.im_or_folder, img_id['file_path'])
+        else:
+            raise NotImplementedError
+
         im = cv2.imread(im_name)
         # image_id = im_name.split('/')[-1][:-4]
         result = get_detections_from_im(cfg, model, im, image_id, args.feat_name,
