@@ -247,14 +247,17 @@ def main(args):
     dets_num = np.zeros((N))
     nms_num = np.zeros((N))
 
-    for i, im_name in enumerate(im_list):
+    for i, img_id in enumerate(info['images']):
+    # for i, im_name in enumerate(im_list):
         # im_base_name = os.path.basename(im_name)
         # image_id = int(im_base_name.split(".")[0].split("_")[2])   ##for COCO
         # image_id = int(im_base_name.split(".")[0])      ##for visual genome
         # out_name =  "COCO_genome_%012d.jpg"%image_id
-        
+
+        image_id = str(img_id['id'])
+        im_name = os.path.join(args.im_or_folder, str(image_id)+'.jpg')
         im = cv2.imread(im_name)
-        image_id = im_name.split('/')[-1][:-4]
+        # image_id = im_name.split('/')[-1][:-4]
         result = get_detections_from_im(cfg, model, im, image_id, args.feat_name,
                                                    args.min_bboxes, args.max_bboxes)
 
