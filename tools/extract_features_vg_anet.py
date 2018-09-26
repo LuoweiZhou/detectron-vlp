@@ -18,7 +18,7 @@
 """Perform inference on a single image or all images with a certain extension
 (e.g., .jpg) in a folder.
 Modified by Tina Jiang
-Again modified by Luowei Zhou
+Last modified by Luowei Zhou on 09/25/2018
 """
 
 from __future__ import absolute_import
@@ -129,6 +129,12 @@ def parse_args():
         default="gpu_0/fc6"
     )
     parser.add_argument(
+        '--list_of_ids',
+        type=str,
+        default=''
+    )
+
+    parser.add_argument(
         'im_or_folder', help='image or folder of images', default=None
     )
 
@@ -148,16 +154,6 @@ def get_detections_from_im(cfg, model, im, image_id, featmap_blob_name, feat_blo
         cls_prob = workspace.FetchBlob("gpu_0/cls_prob")
         rois = workspace.FetchBlob("gpu_0/rois")
         # print('feat map size: {}, region feature size: {}'.format(featmap.shape, region_feat.shape))
-        # print('roi feat size: ', workspace.FetchBlob("gpu_0/roi_feat").shape)
-        # print('res4 output: ', res4_feat.shape)
-        # print('res4 output: ', workspace.FetchBlob("gpu_0/res4_22_sum").shape)
-        # print('pool5 output: ', workspace.FetchBlob("gpu_0/pool5").shape)
-        # print('res5 output: ', workspace.FetchBlob("gpu_0/res5_2_sum").shape)
-        # print('res5_pool output: ', workspace.FetchBlob("gpu_0/res5_pool").shape)
-        # print('fc6 output: ', workspace.FetchBlob("gpu_0/fc6").shape)
-        # print('fc7 output: ', workspace.FetchBlob("gpu_0/fc7").shape)
-        # for i in range(2, 6):
-        #     print('rois_fpn {}, {}'.format(i, workspace.FetchBlob("gpu_0/rois_fpn"+str(i)).shape)) # proposals at each conv. feature map level
         max_conf = np.zeros((rois.shape[0]))
         # unscale back to raw image space
         cls_boxes = rois[:, 1:5] / im_scale
@@ -174,8 +170,7 @@ def get_detections_from_im(cfg, model, im, image_id, featmap_blob_name, feat_blo
         elif len(keep_boxes) > MAX_BOXES:
             keep_boxes = np.argsort(max_conf)[::-1][:MAX_BOXES]
         objects = np.argmax(cls_prob[keep_boxes], axis=1)
-        obj_prob = np.amax(cls_prob[keep_boxes], axis=1)
-
+        obj_prob = np.amax(cls_prob[keep_boxes], axis=1) # proposal not in order!
 
     # return box_features[keep_boxes]
     # print('{} ({}x{}): {} boxes, box size {}, feature size {}, class size {}'.format(image_id,
@@ -185,8 +180,9 @@ def get_detections_from_im(cfg, model, im, image_id, featmap_blob_name, feat_blo
 
     assert(np.sum(objects>=1601) == 0)
     # assert(np.min(obj_prob[:10])>=0.2)
-    if np.min(obj_prob[:10]) < 0.2:
-        print('confidence score too low!', np.min(obj_prob[:10]))
+    # if np.min(obj_prob) < 0.2:
+        # print('confidence score too low!', np.min(obj_prob[:10]))
+        # pass
     # if np.max(cls_boxes[keep_boxes]) > max(np.size(im, 0), np.size(im, 1)):
     #     print('box is offscreen!', np.max(cls_boxes[keep_boxes]), np.size(im, 0), np.size(im, 1))
 
@@ -196,16 +192,9 @@ def get_detections_from_im(cfg, model, im, image_id, featmap_blob_name, feat_blo
         "image_w": np.size(im, 1),
         'num_boxes': len(keep_boxes),
         'boxes': cls_boxes[keep_boxes],
-        # 'featmap': featmap,
         'region_feat': region_feat[keep_boxes],
-        # 'features': box_features[keep_boxes],
-        # 'fc6_feat': fc6_feat[keep_boxes],
-        # 'roi_feat': roi_feat[keep_boxes],
         'object': objects,
         'obj_prob': obj_prob
-        # 'boxes': base64.b64encode(cls_boxes[keep_boxes]),
-        # 'features': base64.b64encode(box_features[keep_boxes]),
-        # 'object': base64.b64encode(objects)
     }
 
 
@@ -227,41 +216,44 @@ def main(args):
 
     results = {}
 
-    N = len(os.listdir(args.im_or_folder))
+    with open(args.list_of_ids) as f:
+        list_of_folder = json.load(f)
+
+    N = len(list_of_folder)
     fpv = 10
     dets_labels = np.zeros((N, fpv, 100, 6))
-    # dets_feat = np.zeros((N, 100, 2048))
-    # fc6_feat = np.zeros((N, 100, 2048))
-    # roi_feat = np.zeros((N, 100, 512, 7, 7))
     dets_num = np.zeros((N, fpv))
     nms_num = np.zeros((N, fpv))
 
     # for i, img_id in enumerate(info['images']):
-    for i, folder_name in enumerate(os.listdir(args.im_or_folder)):
+    for i, folder_name in enumerate(list_of_folder):
         # im_base_name = os.path.basename(im_name)
         # image_id = int(im_base_name.split(".")[0].split("_")[2])   ##for COCO
         # image_id = int(im_base_name.split(".")[0])      ##for visual genome
         # out_name =  "COCO_genome_%012d.jpg"%image_id
 
-      dets_feat = np.zeros((fpv, 100, 2048))
+      # dets_feat = np.zeros((fpv, 100, 2048))
+      dets_feat = []
       for j in range(fpv):
         im_name = os.path.join(args.im_or_folder, folder_name, str(j+1).zfill(2)+args.image_ext)
-        print(im_name)
+        # print(im_name)
 
         im = cv2.imread(im_name)
         # image_id = im_name.split('/')[-1][:-4]
-        result = get_detections_from_im(cfg, model, im, '', '', args.feat_name,
+        try:
+            result = get_detections_from_im(cfg, model, im, '', '', args.feat_name,
                                                    args.min_bboxes, args.max_bboxes)
+        except:
+            print('missing frame: ', im_name)
+            num_frm = j
+            break
 
         # store results
         num_proposal = result['boxes'].shape[0]
         proposals = np.concatenate((result['boxes'], np.expand_dims(result['object'], axis=1),
                                     np.expand_dims(result['obj_prob'], axis=1)), axis=1)
 
-        # dets_feat[i, :num_proposal] = result['region_feat'].squeeze()
-        dets_feat[j] = result['region_feat'].squeeze()
-        # fc6_feat[i, :num_proposal] = result['fc6_feat']
-        # roi_feat[i, :num_proposal] = result['roi_feat']
+        dets_feat.append(result['region_feat'].squeeze())
 
         dets_labels[i, j, :num_proposal] = proposals
         dets_num[i, j] = num_proposal
@@ -269,8 +261,14 @@ def main(args):
 
       # save features to individual npy files
       feat_output_file = os.path.join(args.output_dir, folder_name+'.npy')
-      # np.save(feat_output_file, dets_feat)
-      print(feat_output_file)
+      if len(dets_feat) > 0:
+          dets_feat = np.stack(dets_feat)
+          print('Processed clip {}, feature shape {}'.format(folder_name, dets_feat.shape))
+          np.save(feat_output_file, dets_feat)
+          # np.save(feat_output_file, dets_feat[:num_frm])
+          # print(feat_output_file)
+      else:
+          print('Empty feature file! Skipping {}...'.format(folder_name))
 
       count += 1
 
@@ -281,9 +279,6 @@ def main(args):
 
     f = h5py.File(args.det_output_file, "w")
     f.create_dataset("dets_labels", data=dets_labels)
-    # f.create_dataset("dets_feat", data=dets_feat)
-    # f.create_dataset("fc6_feat", data=fc6_feat)
-    # f.create_dataset("roi_feat", data=roi_feat)
     f.create_dataset("dets_num", data=dets_num)
     f.create_dataset("nms_num", data=nms_num)
     f.close()
