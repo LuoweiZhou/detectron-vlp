@@ -224,6 +224,7 @@ def main(args):
     dets_labels = np.zeros((N, fpv, 100, 6))
     dets_num = np.zeros((N, fpv))
     nms_num = np.zeros((N, fpv))
+    hw = np.zeros((N, 2))
 
     # for i, img_id in enumerate(info['images']):
     for i, folder_name in enumerate(list_of_folder):
@@ -247,6 +248,10 @@ def main(args):
             print('missing frame: ', im_name)
             num_frm = j
             break
+
+        height, width, _ = im.shape
+        hw[i, 0] = height
+        hw[i, 1] = width
 
         # store results
         num_proposal = result['boxes'].shape[0]
@@ -281,6 +286,7 @@ def main(args):
     f.create_dataset("dets_labels", data=dets_labels)
     f.create_dataset("dets_num", data=dets_num)
     f.create_dataset("nms_num", data=nms_num)
+    f.create_dataset("hw", data=hw)
     f.close()
 
 if __name__ == '__main__':

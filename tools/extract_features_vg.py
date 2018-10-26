@@ -157,11 +157,13 @@ def get_detections_from_im(cfg, model, im, image_id, feat_blob_name ,MIN_BOXES, 
         rois = workspace.FetchBlob("gpu_0/rois")
         fc6_feat = workspace.FetchBlob("gpu_0/fc6")
         # print('fc6 feat size: ', fc6_feat.shape)
-        # res4_feat = workspace.FetchBlob("gpu_0/res4_22_sum")
+        # res5_feat = workspace.FetchBlob("gpu_0/res5_2_sum")
         # roi_feat = workspace.FetchBlob("gpu_0/roi_feat")
         # print('roi feat size: ', workspace.FetchBlob("gpu_0/roi_feat").shape)
         # print('res4 output: ', res4_feat.shape)
         # print('res5 output: ', workspace.FetchBlob("gpu_0/res5_2_sum").shape)
+        # for i in range(2, 6):
+        #     print('rois_fpn {}, {}'.format(i, workspace.FetchBlob("gpu_0/rois_fpn"+str(i)).shape)) # proposals at each conv. feature map level
         max_conf = np.zeros((rois.shape[0]))
         # unscale back to raw image space
         cls_boxes = rois[:, 1:5] / im_scale

@@ -8,11 +8,11 @@ import numpy as np
 # Output nms_num size: N',
 
 num_split = 16
-proposal_per_frm = 20
+proposal_per_frm = 100 # 50  # 20
 num_frm = 10
 data_root = '/checkpoint02/luoweizhou/dat/anet/'
-file_prefix = 'others/anet_detection_vg_fc6_feat'
-target_file = data_root+'anet_detection_vg_fc6_feat.h5'
+file_prefix = 'anet_detection_vg_fc6_feat_100rois_png'
+target_file = data_root+'anet_detection_vg_fc6_feat_100rois_png.h5'
 
 dets_labels_lst = []
 dets_num_lst = []
