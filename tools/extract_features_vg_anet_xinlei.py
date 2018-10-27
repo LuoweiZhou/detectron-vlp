@@ -18,9 +18,7 @@
 """Perform inference on a single image or all images with a certain extension
 (e.g., .jpg) in a folder.
 Modified by Tina Jiang
-Last modified by Luowei Zhou on 09/25/2018
-Note on 10/26/2018: in this version, the class nms suppression is done on RoIs,
-rathan than the final per-class box coordinate. Deprecated.
+Last modified by Luowei Zhou on 10/26/2018
 """
 
 from __future__ import absolute_import
@@ -148,31 +146,38 @@ def parse_args():
 
 def get_detections_from_im(cfg, model, im, image_id, featmap_blob_name, feat_blob_name ,MIN_BOXES, MAX_BOXES, conf_thresh=0.2, bboxes=None):
 
+    assert conf_thresh >= 0.
     with c2_utils.NamedCudaScope(0):
         scores, cls_boxes, im_scale = infer_engine.im_detect_bbox(model, im,cfg.TEST.SCALE, cfg.TEST.MAX_SIZE, boxes=bboxes)
-        # box_features = workspace.FetchBlob(feat_blob_name)
-        # featmap = workspace.FetchBlob(featmap_blob_name)
+        num_rpn = scores.shape[0]
         region_feat = workspace.FetchBlob(feat_blob_name)
-        cls_prob = workspace.FetchBlob("gpu_0/cls_prob")
-        rois = workspace.FetchBlob("gpu_0/rois")
-        # print('feat map size: {}, region feature size: {}'.format(featmap.shape, region_feat.shape))
-        max_conf = np.zeros((rois.shape[0]))
+        # cls_prob = workspace.FetchBlob("gpu_0/cls_prob")
+        # rois = workspace.FetchBlob("gpu_0/rois")
+        max_conf = np.zeros((num_rpn,), dtype=np.float32)
+        max_cls = np.zeros((num_rpn,), dtype=np.int32)
+        max_box = np.zeros((num_rpn, 4), dtype=np.float32)
         # unscale back to raw image space
-        cls_boxes = rois[:, 1:5] / im_scale
+        # cls_boxes = rois[:, 1:5] / im_scale
 
-        for cls_ind in range(1, cls_prob.shape[1]):
+        for cls_ind in range(1, cfg.MODEL.NUM_CLASSES):
             cls_scores = scores[:, cls_ind]
-            dets = np.hstack((cls_boxes, cls_scores[:, np.newaxis])).astype(np.float32)
+            dets = np.hstack((cls_boxes[:, (cls_ind*4):(cls_ind*4+4)], cls_scores[:, np.newaxis])).astype(np.float32)
             keep = np.array(nms(dets, cfg.TEST.NMS))
-            max_conf[keep] = np.where(cls_scores[keep] > max_conf[keep], cls_scores[keep], max_conf[keep])
+            inds_update = np.where(cls_scores[keep] > max_conf[keep])
+            kinds = keep[inds_update]
+            max_conf[kinds] = cls_scores[kinds]
+            max_cls[kinds] = cls_ind
+            max_box[kinds] = dets[kinds][:,:4]
 
-        keep_boxes = np.where(max_conf >= conf_thresh)[0]
+        keep_boxes = np.where(max_conf > conf_thresh)[0]
         if len(keep_boxes) < MIN_BOXES:
             keep_boxes = np.argsort(max_conf)[::-1][:MIN_BOXES]
         elif len(keep_boxes) > MAX_BOXES:
             keep_boxes = np.argsort(max_conf)[::-1][:MAX_BOXES]
-        objects = np.argmax(cls_prob[keep_boxes], axis=1)
-        obj_prob = np.amax(cls_prob[keep_boxes], axis=1) # proposal not in order!
+
+        objects = max_cls[keep_boxes]
+        obj_prob = max_conf[keep_boxes]
+        obj_boxes = max_box[keep_boxes, :]
 
     # return box_features[keep_boxes]
     # print('{} ({}x{}): {} boxes, box size {}, feature size {}, class size {}'.format(image_id,
@@ -193,8 +198,8 @@ def get_detections_from_im(cfg, model, im, image_id, featmap_blob_name, feat_blo
         "image_h": np.size(im, 0),
         "image_w": np.size(im, 1),
         'num_boxes': len(keep_boxes),
-        'boxes': cls_boxes[keep_boxes],
-        'region_feat': region_feat[keep_boxes],
+        'boxes': obj_boxes,
+        'region_feat': region_feat[keep_boxes, :],
         'object': objects,
         'obj_prob': obj_prob
     }
