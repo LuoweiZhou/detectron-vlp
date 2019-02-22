@@ -59,7 +59,7 @@ import utils.c2 as c2_utils
 import modeling.region_memory as region_memory_model
 
 logger = logging.getLogger(__name__)
-c2_utils.import_custom_ops()
+# c2_utils.import_custom_ops()
 
 # ---------------------------------------------------------------------------- #
 # Generic recomposable model builders
