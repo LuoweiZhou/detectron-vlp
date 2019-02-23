@@ -91,6 +91,11 @@ def parse_args():
         type=str
     )
     parser.add_argument(
+        '--split',
+        type=int,
+        required=True
+    )
+    parser.add_argument(
         '--output-dir',
         dest='output_dir',
         help='output dir name',
@@ -136,6 +141,7 @@ def get_detections_from_im(cfg, model, im, image_id, featmap_blob_name, feat_blo
 
     assert conf_thresh >= 0.
     with c2_utils.NamedCudaScope(0):
+        start_timer = timeit.default_timer()
         scores, cls_boxes, im_scale = infer_engine.im_detect_bbox(model, im,cfg.TEST.SCALE, cfg.TEST.MAX_SIZE, boxes=bboxes)
         num_rpn = scores.shape[0]
         # region_feat = workspace.FetchBlob(feat_blob_name)
@@ -144,6 +150,7 @@ def get_detections_from_im(cfg, model, im, image_id, featmap_blob_name, feat_blo
         max_conf = np.zeros((num_rpn,), dtype=np.float32)
         max_cls = np.zeros((num_rpn,), dtype=np.int32)
         max_box = np.zeros((num_rpn, 4), dtype=np.float32)
+        mid_timer = timeit.default_timer()
 
         for cls_ind in range(1, cfg.MODEL.NUM_CLASSES):
             cls_scores = scores[:, cls_ind]
@@ -155,6 +162,7 @@ def get_detections_from_im(cfg, model, im, image_id, featmap_blob_name, feat_blo
             max_cls[kinds] = cls_ind
             max_box[kinds] = dets[kinds][:,:4]
 
+        nms_timer = timeit.default_timer()
         keep_boxes = np.where(max_conf > conf_thresh)[0]
         if len(keep_boxes) < MIN_BOXES:
             keep_boxes = np.argsort(max_conf)[::-1][:MIN_BOXES]
@@ -164,20 +172,11 @@ def get_detections_from_im(cfg, model, im, image_id, featmap_blob_name, feat_blo
         objects = max_cls[keep_boxes]
         obj_prob = max_conf[keep_boxes]
         obj_boxes = max_box[keep_boxes, :]
-
-    # return box_features[keep_boxes]
-    # print('{} ({}x{}): {} boxes, box size {}, feature size {}, class size {}'.format(image_id,
-    #       np.size(im, 0), np.size(im, 1), len(keep_boxes), cls_boxes[keep_boxes].shape,
-    #       box_features[keep_boxes].shape, objects.shape))
-    # print(cls_boxes[keep_boxes][:10, :], objects[:10], obj_prob[:10])
+        sort_timer = timeit.default_timer()
+        # print('infer: {:.1f}, nms: {:.1f}, sort: {:.1f}'.format(mid_timer-start_timer, nms_timer-mid_timer, \
+        #     sort_timer-nms_timer))
 
     assert(np.sum(objects>=1601) == 0)
-    # assert(np.min(obj_prob[:10])>=0.2)
-    # if np.min(obj_prob) < 0.2:
-        # print('confidence score too low!', np.min(obj_prob[:10]))
-        # pass
-    # if np.max(cls_boxes[keep_boxes]) > max(np.size(im, 0), np.size(im, 1)):
-    #     print('box is offscreen!', np.max(cls_boxes[keep_boxes]), np.size(im, 0), np.size(im, 1))
 
     return {
         "image_id": image_id,
@@ -209,17 +208,13 @@ def main(args):
 
     results = {}
 
-    list_of_folder = list(range(1, 220848))
-
-    N = len(list_of_folder)
+    # split the task into 40 GPUs
+    itv = int(np.ceil(220847.0/40))
+    list_of_folder = list(range(1+args.split*itv, min(220848, 1+(args.split+1)*itv)))
 
     for i, folder_name in enumerate(list_of_folder):
-        # im_base_name = os.path.basename(im_name)
-        # image_id = int(im_base_name.split(".")[0].split("_")[2])   ##for COCO
-        # image_id = int(im_base_name.split(".")[0])      ##for visual genome
-        # out_name =  "COCO_genome_%012d.jpg"%image_id
-
       folder_name = str(folder_name)
+      print('processing video {}'.format(folder_name))
       vid_path = os.path.join(args.im_or_folder, folder_name)
       fpv = len([j for j in os.listdir(vid_path) if os.path.isfile(os.path.join(vid_path, j))]) # 10
       dets_labels = np.zeros((1, fpv, 100, 6))

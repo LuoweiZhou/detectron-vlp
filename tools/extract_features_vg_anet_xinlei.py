@@ -19,6 +19,7 @@
 (e.g., .jpg) in a folder.
 Modified by Tina Jiang
 Last modified by Luowei Zhou on 10/26/2018
+Compare to extract_features_vg_anet.py, the xinlei version performs NMS on class-dependent coordinates while the original version uses RoIs from RPN.
 """
 
 from __future__ import absolute_import
