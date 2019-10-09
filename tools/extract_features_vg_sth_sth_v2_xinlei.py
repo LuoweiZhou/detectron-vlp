@@ -214,6 +214,9 @@ def main(args):
 
     for i, folder_name in enumerate(list_of_folder):
       folder_name = str(folder_name)
+      if os.path.isfile(os.path.join(args.output_dir, folder_name+'.h5')):
+          print('video {} processed already'.format(folder_name))
+          continue
       print('processing video {}'.format(folder_name))
       vid_path = os.path.join(args.im_or_folder, folder_name)
       fpv = len([j for j in os.listdir(vid_path) if os.path.isfile(os.path.join(vid_path, j))]) # 10
