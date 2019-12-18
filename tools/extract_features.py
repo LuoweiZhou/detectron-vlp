@@ -15,12 +15,11 @@
 # limitations under the License.
 ##############################################################################
 
-"""Perform inference on a single image or all images with a certain extension
+"""
+Perform inference on a single image or all images with a certain extension
 (e.g., .jpg) in a folder.
 Modified by Tina Jiang
-Last modified by Luowei Zhou on 09/25/2018
-Note on 10/26/2018: in this version, the class nms suppression is done on RoIs,
-rathan than the final per-class box coordinate. Deprecated.
+Again modified by Luowei Zhou on 12/18/2019
 """
 
 from __future__ import absolute_import
@@ -44,7 +43,6 @@ import itertools
 
 from utils.io import cache_url
 import utils.c2 as c2_utils
-
 
 c2_utils.import_detectron_ops()
 # OpenCL may be enabled by default in OpenCV3; disable it because it's not
@@ -71,52 +69,54 @@ cv2.ocl.setUseOpenCL(False)
 
 csv.field_size_limit(sys.maxsize)
 
-BOTTOM_UP_FIELDNAMES = ['image_id', 'image_w', 'image_h', 'num_boxes', 'boxes', 'features']
-
-
-FIELDNAMES = ['image_id', 'image_w','image_h','num_boxes', 'boxes', 'features', 'object']
-
 def parse_args():
     parser = argparse.ArgumentParser(description='End-to-end inference')
     parser.add_argument(
         '--cfg',
         dest='cfg',
         help='cfg model file (/path/to/model_config.yaml)',
-        default='/private/home/luoweizhou/subsystem/detectron-xinlei/configs/visual_genome_trainval/e2e_faster_rcnn_X-101-64x4d-FPN_2x.yaml',
+        default='e2e_faster_rcnn_X-101-64x4d-FPN_2x-vlp.yaml',
         type=str
     )
     parser.add_argument(
         '--wts',
         dest='weights',
         help='weights model file (/path/to/model_weights.pkl)',
-        default='/private/home/luoweizhou/subsystem/detectron-xinlei/checkpoint/visual_genome_train+visual_genome_val/e2e_faster_rcnn_X-101-64x4d-FPN_2x/RNG_SEED#1989_FAST_RCNN.MLP_HEAD_DIM#2048_FPN.DIM#512/model_final.pkl',
+        default='e2e_faster_rcnn_X-101-64x4d-FPN_2x-vlp.pkl',
         type=str
     )
     parser.add_argument(
-        '--output-dir',
-        dest='output_dir',
-        help='output dir name',
+        '--box-output-dir',
+        dest='box_output_dir',
+        help='bounding box output dir name',
         required=True,
         type=str
     )
     parser.add_argument(
-        '--det-output-file',
-        dest='det_output_file',
-        default='log/flickr30k_detection_vg_thresh0.2_feat.h5',
+        '--featcls-output-dir',
+        dest='featcls_output_dir',
+        help='region feature and class prob output dir name',
+        required=True,
+        type=str
+    )
+    parser.add_argument(
+        '--output-file-prefix',
+        dest='output_file_prefix',
+        required=True,
         type=str
     )
     parser.add_argument(
         '--image-ext',
         dest='image_ext',
         help='image file name extension (default: jpg)',
-        default='.jpg',
+        default='jpg',
         type=str
     )
     parser.add_argument(
         '--min_bboxes',
         help=" min number of bboxes",
         type=int,
-        default=10
+        default=100
     )
     parser.add_argument(
         '--max_bboxes',
@@ -131,13 +131,27 @@ def parse_args():
         default="gpu_0/fc6"
     )
     parser.add_argument(
-        '--list_of_ids',
+        '--dataset',
+        help='Support dataset COCO | CC | Flickr30k | SBU',
         type=str,
-        default=''
+        default='Flickr30k'
     )
-
     parser.add_argument(
-        'im_or_folder', help='image or folder of images', default=None
+        '--proc_split',
+        help='only process image IDs that match this pattern at the end',
+        type=str,
+        default='000'
+    )
+    parser.add_argument(
+        '--data_type',
+        help='default float32, set to float16 to save storage space (e.g., for CC and SBU)',
+        type=str,
+        default='float32'
+    )
+    parser.add_argument(
+        'im_or_folder',
+        help='image or folder of images',
+        default=None
     )
 
     if len(sys.argv) == 1:
@@ -148,43 +162,45 @@ def parse_args():
 
 def get_detections_from_im(cfg, model, im, image_id, featmap_blob_name, feat_blob_name ,MIN_BOXES, MAX_BOXES, conf_thresh=0.2, bboxes=None):
 
+    assert conf_thresh >= 0.
     with c2_utils.NamedCudaScope(0):
         scores, cls_boxes, im_scale = infer_engine.im_detect_bbox(model, im,cfg.TEST.SCALE, cfg.TEST.MAX_SIZE, boxes=bboxes)
-        # box_features = workspace.FetchBlob(feat_blob_name)
-        # featmap = workspace.FetchBlob(featmap_blob_name)
+        num_rpn = scores.shape[0]
         region_feat = workspace.FetchBlob(feat_blob_name)
-        cls_prob = workspace.FetchBlob("gpu_0/cls_prob")
-        rois = workspace.FetchBlob("gpu_0/rois")
-        # print('feat map size: {}, region feature size: {}'.format(featmap.shape, region_feat.shape))
-        max_conf = np.zeros((rois.shape[0]))
-        # unscale back to raw image space
-        cls_boxes = rois[:, 1:5] / im_scale
+        max_conf = np.zeros((num_rpn,), dtype=np.float32)
+        max_cls = np.zeros((num_rpn,), dtype=np.int32)
+        max_box = np.zeros((num_rpn, 4), dtype=np.float32)
 
-        for cls_ind in range(1, cls_prob.shape[1]):
+        for cls_ind in range(1, cfg.MODEL.NUM_CLASSES):
             cls_scores = scores[:, cls_ind]
-            dets = np.hstack((cls_boxes, cls_scores[:, np.newaxis])).astype(np.float32)
+            dets = np.hstack((cls_boxes[:, (cls_ind*4):(cls_ind*4+4)], cls_scores[:, np.newaxis])).astype(np.float32)
             keep = np.array(nms(dets, cfg.TEST.NMS))
-            max_conf[keep] = np.where(cls_scores[keep] > max_conf[keep], cls_scores[keep], max_conf[keep])
+            inds_update = np.where(cls_scores[keep] > max_conf[keep])
+            kinds = keep[inds_update]
+            max_conf[kinds] = cls_scores[kinds]
+            max_cls[kinds] = cls_ind
+            max_box[kinds] = dets[kinds][:,:4]
 
-        keep_boxes = np.where(max_conf >= conf_thresh)[0]
+        keep_boxes = np.where(max_conf > conf_thresh)[0]
         if len(keep_boxes) < MIN_BOXES:
             keep_boxes = np.argsort(max_conf)[::-1][:MIN_BOXES]
         elif len(keep_boxes) > MAX_BOXES:
             keep_boxes = np.argsort(max_conf)[::-1][:MAX_BOXES]
-        objects = np.argmax(cls_prob[keep_boxes], axis=1)
-        obj_prob = np.amax(cls_prob[keep_boxes], axis=1) # proposal not in order!
 
-    # return box_features[keep_boxes]
+        objects = max_cls[keep_boxes]
+        obj_prob = max_conf[keep_boxes]
+        obj_boxes = max_box[keep_boxes, :]
+        cls_prob = scores[keep_boxes, :]
+
     # print('{} ({}x{}): {} boxes, box size {}, feature size {}, class size {}'.format(image_id,
     #       np.size(im, 0), np.size(im, 1), len(keep_boxes), cls_boxes[keep_boxes].shape,
     #       box_features[keep_boxes].shape, objects.shape))
     # print(cls_boxes[keep_boxes][:10, :], objects[:10], obj_prob[:10])
 
-    assert(np.sum(objects>=1601) == 0)
+    assert(np.sum(objects>=cfg.MODEL.NUM_CLASSES) == 0)
     # assert(np.min(obj_prob[:10])>=0.2)
     # if np.min(obj_prob) < 0.2:
         # print('confidence score too low!', np.min(obj_prob[:10]))
-        # pass
     # if np.max(cls_boxes[keep_boxes]) > max(np.size(im, 0), np.size(im, 1)):
     #     print('box is offscreen!', np.max(cls_boxes[keep_boxes]), np.size(im, 0), np.size(im, 1))
 
@@ -193,10 +209,11 @@ def get_detections_from_im(cfg, model, im, image_id, featmap_blob_name, feat_blo
         "image_h": np.size(im, 0),
         "image_w": np.size(im, 1),
         'num_boxes': len(keep_boxes),
-        'boxes': cls_boxes[keep_boxes],
-        'region_feat': region_feat[keep_boxes],
+        'boxes': obj_boxes,
+        'region_feat': region_feat[keep_boxes, :],
         'object': objects,
-        'obj_prob': obj_prob
+        'obj_prob': obj_prob,
+        'cls_prob': cls_prob
     }
 
 
@@ -209,91 +226,59 @@ def main(args):
     model = infer_engine.initialize_model_from_cfg(args.weights)
     start = timeit.default_timer()
 
-    ##extract bboxes from bottom-up attention model
-    image_bboxes={}
-
+    # extract region bboxes and features from pre-trained models
     count = 0
-    if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
+    if not os.path.exists(args.box_output_dir):
+        os.makedirs(args.box_output_dir)
+    if not os.path.exists(args.featcls_output_dir):
+        os.makedirs(args.featcls_output_dir)
 
     results = {}
 
-    with open(args.list_of_ids) as f:
-        list_of_folder = json.load(f)
+    with h5py.File(os.path.join(args.box_output_dir, args.output_file_prefix+'_bbox'+args.proc_split+'.h5'), "w") as f, \
+        h5py.File(os.path.join(args.featcls_output_dir, args.output_file_prefix+'_feat'+args.proc_split+'.h5'), "w") as f_feat, \
+        h5py.File(os.path.join(args.featcls_output_dir, args.output_file_prefix+'_cls'+args.proc_split+'.h5'), "w") as f_cls:
 
-    N = len(list_of_folder)
-    fpv = 10
-    dets_labels = np.zeros((N, fpv, 100, 6))
-    dets_num = np.zeros((N, fpv))
-    nms_num = np.zeros((N, fpv))
-    hw = np.zeros((N, 2))
+        if args.dataset in ('COCO', 'Flickr30k'):
+            if os.path.isdir(args.im_or_folder):
+                im_list = glob.iglob(args.im_or_folder + '/*.' + args.image_ext)
+        elif args.dataset == 'CC':
+            valid_ids = json.load(open('/mnt/dat/CC/annotations/cc_valid_jpgs.json')) # some images are broken. hard coded for now
+            im_list = valid_ids.keys()
+            print('number of valid CC images {}'.format(len(im_list)))
+        elif args.dataset == 'SBU':
+            valid_ids = json.load(open('/z/dat/VLP/dat/SBU/annotations/sbu_valid_jpgs.json')) # some images are broken. hard coded for now
+            im_list = valid_ids.keys()
+            print('number of valid SBU images {}'.format(len(im_list)))
 
-    # for i, img_id in enumerate(info['images']):
-    for i, folder_name in enumerate(list_of_folder):
-        # im_base_name = os.path.basename(im_name)
-        # image_id = int(im_base_name.split(".")[0].split("_")[2])   ##for COCO
-        # image_id = int(im_base_name.split(".")[0])      ##for visual genome
-        # out_name =  "COCO_genome_%012d.jpg"%image_id
+        for i, im_name in enumerate(im_list):
+            im_base_name = os.path.basename(im_name)
+            image_id = im_base_name
+            if image_id[-4-len(args.proc_split):-4] == args.proc_split:
+                im_name = os.path.join(args.im_or_folder, image_id)
 
-      # dets_feat = np.zeros((fpv, 100, 2048))
-      dets_feat = []
-      for j in range(fpv):
-        im_name = os.path.join(args.im_or_folder, folder_name, str(j+1).zfill(2)+args.image_ext)
-        # print(im_name)
+                print(im_name)
+                im = cv2.imread(im_name)
+                result = get_detections_from_im(cfg, model, im, image_id, '', args.feat_name,
+                                                           args.min_bboxes, args.max_bboxes)
+                # store results
+                proposals = np.concatenate((result['boxes'], np.expand_dims(result['object'], axis=1) \
+                    .astype(np.float32), np.expand_dims(result['obj_prob'], axis=1)), axis=1)
 
-        im = cv2.imread(im_name)
-        # image_id = im_name.split('/')[-1][:-4]
-        try:
-            result = get_detections_from_im(cfg, model, im, '', '', args.feat_name,
-                                                   args.min_bboxes, args.max_bboxes)
-        except:
-            print('missing frame: ', im_name)
-            num_frm = j
-            break
+                # save feature map to individual npy files
+                f.create_dataset(image_id[:-4], data=proposals.astype(args.data_type))
+                f_feat.create_dataset(image_id[:-4], data=result['region_feat'].squeeze().astype(args.data_type))
+                f_cls.create_dataset(image_id[:-4], data=result['cls_prob'].astype(args.data_type))
 
-        height, width, _ = im.shape
-        hw[i, 0] = height
-        hw[i, 1] = width
+                count += 1
+                if count % 10 == 0:
+                    end = timeit.default_timer()
+                    epoch_time = end - start
+                    print('process {:d} images after {:.1f} s'.format(count, epoch_time))
 
-        # store results
-        num_proposal = result['boxes'].shape[0]
-        proposals = np.concatenate((result['boxes'], np.expand_dims(result['object'], axis=1),
-                                    np.expand_dims(result['obj_prob'], axis=1)), axis=1)
-
-        dets_feat.append(result['region_feat'].squeeze())
-
-        dets_labels[i, j, :num_proposal] = proposals
-        dets_num[i, j] = num_proposal
-        nms_num[i, j] = num_proposal # for now, treat them the same
-
-      # save features to individual npy files
-      feat_output_file = os.path.join(args.output_dir, folder_name+'.npy')
-      if len(dets_feat) > 0:
-          dets_feat = np.stack(dets_feat)
-          print('Processed clip {}, feature shape {}'.format(folder_name, dets_feat.shape))
-          np.save(feat_output_file, dets_feat)
-          # np.save(feat_output_file, dets_feat[:num_frm])
-          # print(feat_output_file)
-      else:
-          print('Empty feature file! Skipping {}...'.format(folder_name))
-
-      count += 1
-
-      if count % 10 == 0:
-          end = timeit.default_timer()
-          epoch_time = end - start
-          print('process {:d} videos after {:.1f} s'.format(count, epoch_time))
-
-    f = h5py.File(args.det_output_file, "w")
-    f.create_dataset("dets_labels", data=dets_labels)
-    f.create_dataset("dets_num", data=dets_num)
-    f.create_dataset("nms_num", data=nms_num)
-    f.create_dataset("hw", data=hw)
-    f.close()
 
 if __name__ == '__main__':
     workspace.GlobalInit(['caffe2', '--caffe2_log_level=0'])
     utils.logging.setup_logging(__name__)
     args = parse_args()
-    print(args)
     main(args)
