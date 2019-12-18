@@ -265,7 +265,6 @@ def main(args):
                 proposals = np.concatenate((result['boxes'], np.expand_dims(result['object'], axis=1) \
                     .astype(np.float32), np.expand_dims(result['obj_prob'], axis=1)), axis=1)
 
-                # save feature map to individual npy files
                 f.create_dataset(image_id[:-4], data=proposals.astype(args.data_type))
                 f_feat.create_dataset(image_id[:-4], data=result['region_feat'].squeeze().astype(args.data_type))
                 f_cls.create_dataset(image_id[:-4], data=result['cls_prob'].astype(args.data_type))
