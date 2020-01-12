@@ -11,7 +11,7 @@
 DATA_ROOT=tmp/release/Flickr30k
 
 python tools/extract_features.py \
-    --featcls-output-dir $DATA_ROOT/region_feat_gvd_wo_bgd/feat_cls_1000_float16 \
+    --featcls-output-dir $DATA_ROOT/region_feat_gvd_wo_bgd/feat_cls_1000 \
     --box-output-dir $DATA_ROOT/region_feat_gvd_wo_bgd/raw_bbox \
     --output-file-prefix flickr30k_detection_vg_100dets_vlp_checkpoint_trainval \
     --max_bboxes 100 --min_bboxes 100 \
