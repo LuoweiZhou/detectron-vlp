@@ -22,7 +22,9 @@ Perform inference on a single image or all images with a certain extension
 Modified by Tina Jiang
 Last modified by Luowei Zhou on 09/25/2018
 
-Note on 04/01/2020: this file is initially written for our CVPR 2019 work Grounded Video Description (GVD) and it is really old... The data storage/loading is inefficient (.npy files instead of batched .h5 files). Hence, this file is deprecated and only for reproducing the original feature files in GVD. Use the more recent code on VLP (under the same dir) if you can.
+Note on 04/01/2020: this file is initially written for our CVPR 2019 work Grounded Video Description (GVD) and it is really old...
+The data storage/loading is inefficient (.npy files instead of batched .h5 files). Hence, this file is deprecated and only for
+reproducing the original feature files in GVD. Use the more recent code on VLP (under the same dir) if you can.
 """
 
 from __future__ import absolute_import
@@ -99,7 +101,7 @@ def parse_args():
     parser.add_argument(
         '--det-output-file',
         dest='det_output_file',
-        default='log/flickr30k_detection_vg_thresh0.2_feat.h5',
+        default='anet_detection_vg_thresh0.2_feat.h5',
         type=str
     )
     parser.add_argument(
@@ -123,7 +125,7 @@ def parse_args():
     )
     parser.add_argument(
         '--feat_name',
-        help=" the name of the feature to extract, default: gpu_0/fc7",
+        help=" the name of the feature to extract, default: gpu_0/fc6",
         type=str,
         default="gpu_0/fc6"
     )
@@ -191,7 +193,7 @@ def main(args):
     model = infer_engine.initialize_model_from_cfg(args.weights)
     start = timeit.default_timer()
 
-    ## extract bboxes from bottom-up attention model
+    # extract bboxes from bottom-up attention model
     image_bboxes={}
 
     count = 0
@@ -213,7 +215,7 @@ def main(args):
     for i, folder_name in enumerate(list_of_folder):
         dets_feat = []
         for j in range(fpv):
-            im_name = os.path.join(args.im_or_folder, folder_name, str(j+1).zfill(2)+args.image_ext)
+            im_name = os.path.join(args.im_or_folder, folder_name, str(j + 1).zfill(2) + args.image_ext)
 
             im = cv2.imread(im_name)
             try:
@@ -240,7 +242,7 @@ def main(args):
             nms_num[i, j] = num_proposal # for now, treat them the same
 
         # save features to individual npy files
-        feat_output_file = os.path.join(args.output_dir, folder_name+'.npy')
+        feat_output_file = os.path.join(args.output_dir, folder_name + '.npy')
         if len(dets_feat) > 0:
             dets_feat = np.stack(dets_feat)
             print('Processed clip {}, feature shape {}'.format(folder_name, dets_feat.shape))

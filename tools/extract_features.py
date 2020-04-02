@@ -126,7 +126,7 @@ def parse_args():
     )
     parser.add_argument(
         '--feat_name',
-        help=" the name of the feature to extract, default: gpu_0/fc7",
+        help=" the name of the feature to extract, default: gpu_0/fc6",
         type=str,
         default="gpu_0/fc6"
     )
