@@ -113,26 +113,27 @@ def parse_args():
     )
     parser.add_argument(
         '--min_bboxes',
-        help=" min number of bboxes",
+        help='min number of bboxes',
         type=int,
         default=100
     )
     parser.add_argument(
         '--max_bboxes',
-        help=" min number of bboxes",
+        help='min number of bboxes',
         type=int,
         default=100
     )
     parser.add_argument(
         '--feat_name',
-        help=" the name of the feature to extract, default: gpu_0/fc6",
+        help='the name of the feature to extract, default: gpu_0/fc6',
         type=str,
-        default="gpu_0/fc6"
+        default='gpu_0/fc6'
     )
     parser.add_argument(
         '--list_of_ids',
+        help='the ids should be consistent with what is in dic_anet.json',
         type=str,
-        default=''
+        default='dic_anet.json'
     )
 
     parser.add_argument(
@@ -203,9 +204,18 @@ def main(args):
     results = {}
 
     if os.path.isdir(args.im_or_folder):
-        list_of_folder = os.listdir(args.im_or_folder)
+        # (legacy) the order of list_of_ids has to be consistent with dic_anet.json generated
+        # from the GVD prepro script for correct data loading
+        # target_ids = set(os.listdir(args.im_or_folder)) # temp, when a target split is given
+        # list_of_folder = [i['id'] for i in json.load(open(args.list_of_ids))['videos'] \
+        #     if i['id'] in target_ids]
+        list_of_folder = [i['id'] for i in json.load(open(args.list_of_ids))['videos']]
+    else:
+        list_of_folder = []
+
 
     N = len(list_of_folder)
+    print('Number of segments to generate proposals for: ', N)
     fpv = 10
     dets_labels = np.zeros((N, fpv, 100, 6))
     dets_num = np.zeros((N, fpv))
