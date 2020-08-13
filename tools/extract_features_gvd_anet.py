@@ -269,8 +269,8 @@ def main(args):
 
     f = h5py.File(args.det_output_file, "w")
     f.create_dataset("dets_labels", data=dets_labels)
-    f.create_dataset("dets_num", data=dets_num)
-    f.create_dataset("nms_num", data=nms_num)
+    f.create_dataset("dets_num", data=dets_num.sum(axis=-1))
+    f.create_dataset("nms_num", data=nms_num).sum(axis=-1)
     f.create_dataset("hw", data=hw)
     f.close()
 
