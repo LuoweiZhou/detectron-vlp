@@ -242,7 +242,7 @@ def main(args):
 
             # store results
             num_proposal = result['boxes'].shape[0]
-            proposals = np.concatenate((result['boxes'], np.expand_dims(result['object'], axis=1),
+            proposals = np.concatenate((result['boxes'], np.ones((num_proposal, 1)) * j, np.expand_dims(result['object'], axis=1),
                                         np.expand_dims(result['obj_prob'], axis=1)), axis=1)
 
             dets_feat.append(result['region_feat'].squeeze())
