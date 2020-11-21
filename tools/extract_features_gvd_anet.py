@@ -268,7 +268,7 @@ def main(args):
             print('process {:d} videos after {:.1f} s'.format(count, epoch_time))
 
     f = h5py.File(args.det_output_file, "w")
-    f.create_dataset("dets_labels", data=dets_labels.view(N, -1, 7))
+    f.create_dataset("dets_labels", data=dets_labels.reshape(N, -1, 7))
     f.create_dataset("dets_num", data=dets_num.sum(axis=-1))
     f.create_dataset("nms_num", data=nms_num.sum(axis=-1))
     f.create_dataset("hw", data=hw)
